@@ -3001,7 +3001,7 @@ Instruções:
 - Não use markdown excessivo, prefira texto limpo com negrito pontual`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(AI_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3117,7 +3117,7 @@ Responda APENAS com JSON válido, sem texto antes ou depois, neste formato exato
 }`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(AI_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3282,7 +3282,7 @@ async function mostrarResultado() {
 ${erradas ? `Tópicos em que errou: ${erradas}.` : 'Acertou tudo!'}
 Em 3-4 frases curtas, dê um feedback motivador e 2 dicas práticas de como melhorar. Seja direto e encorajador.`;
 
-    const fbRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const fbRes = await fetch(AI_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3372,7 +3372,10 @@ function initSimulados() {
 // ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
 // ⚠️ SUBSTITUA pelas suas chaves do painel Supabase (Project Settings → API)
 const SUPABASE_URL  = 'https://vxhkppfelyvslmekzqwo.supabase.co';
-const SUPABASE_KEY  = 'sb_publishable_hMznwVng5b4Vguig4brJPg_I86-lBNf';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4aGtwcGZlbHl2c2xtZWt6cXdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MjE1NjAsImV4cCI6MjA4ODk5NzU2MH0.WWQwGCOhobFJp64idQJYPatmgAbcslnM6NmfPfKtdpg';
+
+// Proxy para a API de IA (resolve bloqueio CORS do GitHub Pages)
+const AI_PROXY_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`;
 
 let sb = null;
 let currentUser = null;
