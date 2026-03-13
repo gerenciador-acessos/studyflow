@@ -1,0 +1,3819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyFlow — Planejador de Estudos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #f5f3ee;
+  --surface: #faf9f6;
+  --card: #ffffff;
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.15);
+  --text: #1a1916;
+  --text-2: #6b6860;
+  --text-3: #9e9b95;
+  --accent: #2d6a4f;
+  --accent-light: #e8f5ef;
+  --accent-grad: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%);
+  --accent-2: #b5451b;
+  --accent-2-light: #fdf0ec;
+  --blue: #1e4b8f;
+  --blue-light: #e8eef8;
+  --amber: #92600a;
+  --amber-light: #fdf5e6;
+  --purple: #5b3b8c;
+  --purple-light: #f0eafa;
+  --teal: #0d6e6e;
+  --teal-light: #e5f5f5;
+  --red: #b91c1c;
+  --red-light: #fef2f2;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --is-dark: 0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+}
+
+/* LAYOUT */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+.sidebar {
+  width: 240px;
+  background: var(--text);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.sidebar-logo {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-logo h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+.nav { padding: 16px 12px; flex: 1; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  color: rgba(255,255,255,0.6);
+  transition: all .15s;
+  user-select: none;
+  margin-bottom: 2px;
+}
+.nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
+.nav-item.active { background: rgba(255,255,255,0.12); color: #fff; font-weight: 500; }
+.nav-item svg { opacity: .7; flex-shrink: 0; }
+.nav-item.active svg { opacity: 1; }
+
+.nav-section {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 16px 12px 6px;
+}
+
+.sidebar-bottom {
+  padding: 16px 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.concurso-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background .15s;
+  margin-bottom: 4px;
+}
+.concurso-pill:hover { background: rgba(255,255,255,0.07); }
+.concurso-pill .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.concurso-pill span { font-size: 12px; color: rgba(255,255,255,0.65); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.concurso-pill .days { font-size: 10px; color: rgba(255,255,255,0.35); }
+
+/* MAIN */
+.main { flex: 1; overflow-y: auto; }
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar h2 { font-family: 'DM Serif Display', serif; font-size: 20px; font-weight: 400; }
+.topbar p { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+
+.content { padding: 32px; max-width: 1100px; }
+
+/* CARDS */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+
+.metric-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.metric-card.green::before { background: linear-gradient(90deg, #2d6a4f, #52b788); }
+.metric-card.blue::before { background: linear-gradient(90deg, #1e4b8f, #4895ef); }
+.metric-card.amber::before { background: linear-gradient(90deg, #92600a, #e9a319); }
+.metric-card.purple::before { background: linear-gradient(90deg, #5b3b8c, #9d4edd); }
+
+.metric-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.metric-value { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--text); line-height: 1; }
+.metric-sub { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+
+/* GRIDS */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* TABS */
+.tab-page { display: none; }
+.tab-page.active { display: block; }
+
+/* SECTION TITLE */
+.section-title { font-family: 'DM Serif Display', serif; font-size: 17px; font-weight: 400; margin-bottom: 16px; }
+.section-subtitle { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+/* FORM */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 12px; color: var(--text-2); font-weight: 500; display: block; margin-bottom: 5px; letter-spacing: 0.2px; }
+input[type=text], input[type=number], input[type=date], input[type=email], select, textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  transition: border .15s, box-shadow .15s;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(45,106,79,0.1);
+}
+textarea { resize: vertical; min-height: 80px; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--card);
+  color: var(--text);
+  transition: all .15s;
+}
+.btn:hover { background: var(--bg); }
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--accent-grad);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.btn-primary:hover { filter: brightness(1.1); background: var(--accent-grad); }
+
+.btn-danger {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  color: var(--red);
+  border-color: transparent;
+}
+.btn-danger:hover { filter: brightness(0.97); }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-icon { padding: 6px; border: none; background: none; cursor: pointer; color: var(--text-3); border-radius: 6px; transition: all .15s; }
+.btn-icon:hover { background: var(--bg); color: var(--text); }
+
+/* BADGE */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+.badge-green { background: var(--accent-light); color: var(--accent); }
+.badge-blue { background: var(--blue-light); color: var(--blue); }
+.badge-amber { background: var(--amber-light); color: var(--amber); }
+.badge-red { background: var(--red-light); color: var(--red); }
+.badge-purple { background: var(--purple-light); color: var(--purple); }
+.badge-teal { background: var(--teal-light); color: var(--teal); }
+
+/* PROGRESS */
+.progress-wrap { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+
+/* TABLE / LIST */
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.list-item:last-child { border-bottom: none; }
+
+/* CONCURSO CARD */
+.concurso-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  border-left: 4px solid transparent;
+}
+
+/* TIMER */
+.timer-huge {
+  font-family: 'DM Serif Display', serif;
+  font-size: 72px;
+  text-align: center;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin: 24px 0;
+  font-variant-numeric: tabular-nums;
+}
+.timer-controls { display: flex; gap: 10px; justify-content: center; margin-bottom: 24px; }
+
+/* NOTIFICATION BANNER */
+.notif-banner {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--text);
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  max-width: 320px;
+  transform: translateX(400px);
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+.notif-banner.show { transform: translateX(0); }
+.notif-banner.success { border-left: 3px solid #4ade80; }
+.notif-banner.warning { border-left: 3px solid #fbbf24; }
+.notif-banner.info { border-left: 3px solid #60a5fa; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 28px;
+  width: 500px;
+  max-width: 95vw;
+  box-shadow: var(--shadow-md);
+  transform: scale(0.95);
+  transition: transform .2s;
+}
+.modal-overlay.show .modal { transform: scale(1); }
+.modal-title { font-family: 'DM Serif Display', serif; font-size: 20px; margin-bottom: 20px; }
+
+/* METAS SEMANA */
+.week-ring {
+  width: 90px; height: 90px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* COLOR DOT */
+.color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+/* EMPTY */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-3);
+}
+.empty-state svg { opacity: .3; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+/* CHIP */
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 20px; font-size: 12px; color: var(--text-2); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+
+/* ═══════════════ DARK THEME ═══════════════ */
+body.theme-dark {
+  --bg: #0f1117;
+  --surface: #161b27;
+  --card: #1e2433;
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.13);
+  --text: #e8eaf0;
+  --text-2: #9aa0b4;
+  --text-3: #5c6480;
+  --accent: #52b788;
+  --accent-light: rgba(82,183,136,0.12);
+  --accent-grad: linear-gradient(135deg, #2d6a4f 0%, #52b788 100%);
+  --accent-2: #e07c5a;
+  --accent-2-light: rgba(224,124,90,0.12);
+  --blue: #4895ef;
+  --blue-light: rgba(72,149,239,0.12);
+  --amber: #e9a319;
+  --amber-light: rgba(233,163,25,0.12);
+  --purple: #9d4edd;
+  --purple-light: rgba(157,78,221,0.12);
+  --teal: #2ec4b6;
+  --teal-light: rgba(46,196,182,0.12);
+  --red: #f87171;
+  --red-light: rgba(248,113,113,0.12);
+  --shadow: 0 2px 8px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25);
+  --shadow-md: 0 6px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+}
+
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea {
+  color-scheme: dark;
+}
+
+body.theme-dark .topbar {
+  background: var(--surface);
+  border-bottom-color: var(--border);
+}
+
+body.theme-dark .progress-wrap {
+  background: rgba(255,255,255,0.06);
+}
+
+body.theme-dark .btn {
+  background: var(--card);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+body.theme-dark .btn:hover { background: rgba(255,255,255,0.06); }
+
+body.theme-dark .metric-card.green::before { background: linear-gradient(90deg,#2d6a4f,#52b788); }
+body.theme-dark .metric-card.blue::before  { background: linear-gradient(90deg,#1e4b8f,#4895ef); }
+body.theme-dark .metric-card.amber::before { background: linear-gradient(90deg,#92600a,#e9a319); }
+body.theme-dark .metric-card.purple::before{ background: linear-gradient(90deg,#5b3b8c,#9d4edd); }
+
+body.theme-dark .ai-bubble.bot {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+body.theme-dark .chip {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-strong);
+}
+
+body.theme-dark .concurso-card {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+body.theme-dark .modal {
+  background: var(--card);
+}
+
+body.theme-dark .notif-banner {
+  background: #2a3040;
+  border: 1px solid var(--border-strong);
+}
+
+body.theme-dark .mobile-nav {
+  background: var(--surface);
+  border-top-color: var(--border-strong);
+}
+
+body.theme-dark input:focus,
+body.theme-dark select:focus,
+body.theme-dark textarea:focus {
+  box-shadow: 0 0 0 3px rgba(82,183,136,0.2);
+  border-color: var(--accent);
+}
+
+
+/* POMO */
+.pomo-display {
+  font-family: 'DM Serif Display', serif;
+  font-size: 56px;
+  text-align: center;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin: 16px 0;
+}
+.pomo-label { text-align: center; font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.pomo-dots { display: flex; gap: 6px; justify-content: center; margin: 12px 0; }
+.pomo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); transition: background .3s; }
+.pomo-dot.done { background: var(--accent); }
+
+/* GOAL CHIP */
+.goal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* EXPORT AREA */
+.export-preview {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 20px;
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* THEME SWATCHES */
+.theme-swatch {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.theme-swatch:hover { transform: scale(1.15); }
+.theme-swatch.active { border-color: rgba(255,255,255,0.8); transform: scale(1.1); }
+
+/* AI CHAT */
+.ai-chat-wrap {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 140px);
+  max-width: 820px;
+}
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ai-msg {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.ai-msg.user { flex-direction: row-reverse; }
+.ai-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  flex-shrink: 0;
+}
+.ai-avatar.bot { background: var(--accent); color: #fff; }
+.ai-avatar.user-av { background: var(--bg); border: 1px solid var(--border-strong); color: var(--text-2); font-size: 11px; }
+.ai-bubble {
+  max-width: 78%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.ai-bubble.bot {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px 16px 16px 16px;
+}
+.ai-bubble.user {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 16px 4px 16px 16px;
+}
+.ai-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-top: 16px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.ai-input-row textarea {
+  flex: 1; border: none; background: transparent; resize: none;
+  font-size: 14px; outline: none; line-height: 1.5;
+  max-height: 120px; min-height: 40px;
+  color: var(--text);
+  padding: 2px 0;
+}
+.ai-send-btn {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: var(--accent-grad); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: filter .15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.ai-send-btn:hover { filter: brightness(1.12); }
+.ai-send-btn:disabled { background: var(--border-strong); box-shadow: none; cursor: default; filter: none; }
+.ai-typing { display: flex; gap: 4px; align-items: center; padding: 12px 16px; }
+.ai-typing span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-3); animation: bounce 1.2s infinite;
+}
+.ai-typing span:nth-child(2) { animation-delay: .2s; }
+.ai-typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+.ai-suggestions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+}
+.ai-suggestion {
+  font-size: 12px; padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px; cursor: pointer;
+  background: var(--card); color: var(--text-2);
+  transition: all .15s;
+}
+.ai-suggestion:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ai-bubble p { margin-bottom: 8px; }
+.ai-bubble p:last-child { margin-bottom: 0; }
+.ai-bubble strong { font-weight: 600; }
+.ai-bubble ul, .ai-bubble ol { padding-left: 18px; margin: 6px 0; }
+.ai-bubble li { margin-bottom: 4px; }
+.ai-context-bar {
+  background: var(--accent-light);
+  border: 1px solid rgba(45,106,79,0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ═══════════════ SIMULADOS ═══════════════ */
+.sim-config { max-width: 680px; margin: 0 auto; }
+.sim-question-wrap { max-width: 780px; margin: 0 auto; }
+
+.sim-opcao {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 14px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-strong);
+  background: var(--card); cursor: pointer;
+  transition: all .18s; margin-bottom: 10px;
+  font-size: 14px; line-height: 1.5; color: var(--text);
+}
+.sim-opcao:hover { border-color: var(--accent); background: var(--accent-light); }
+.sim-opcao.selecionada { border-color: var(--accent); background: var(--accent-light); }
+.sim-opcao.correta { border-color: #22c55e; background: #f0fdf4; color: #14532d; }
+.sim-opcao.errada { border-color: #ef4444; background: #fef2f2; color: #7f1d1d; }
+body.theme-dark .sim-opcao.correta { background: rgba(34,197,94,0.12); color: #86efac; border-color: #22c55e; }
+body.theme-dark .sim-opcao.errada  { background: rgba(239,68,68,0.12); color: #fca5a5; border-color: #ef4444; }
+
+.sim-letra {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bg); border: 1.5px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; flex-shrink: 0;
+  transition: all .18s;
+}
+.sim-opcao.selecionada .sim-letra { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sim-opcao.correta .sim-letra { background: #22c55e; color: #fff; border-color: #22c55e; }
+.sim-opcao.errada .sim-letra   { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+.sim-gabarito {
+  margin-top: 16px; padding: 16px;
+  border-radius: var(--radius-sm); border-left: 4px solid var(--accent);
+  background: var(--accent-light); font-size: 13px; line-height: 1.7;
+  display: none;
+}
+.sim-gabarito.show { display: block; }
+
+.sim-progress-bar {
+  height: 8px; border-radius: 4px;
+  background: var(--border-strong); overflow: hidden; margin-bottom: 6px;
+}
+.sim-progress-fill {
+  height: 100%; border-radius: 4px;
+  background: var(--accent-grad); transition: width .4s ease;
+}
+
+.sim-stat-box {
+  text-align: center; padding: 20px 12px;
+  background: var(--bg); border-radius: var(--radius-sm);
+}
+.sim-stat-num { font-family: 'DM Serif Display', serif; font-size: 32px; line-height: 1; }
+.sim-stat-label { font-size: 11px; color: var(--text-3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.6px; }
+
+.sim-loading {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px 20px; gap: 16px; color: var(--text-3);
+}
+.sim-spinner {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.bancas-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 20px;
+}
+.banca-card {
+  padding: 12px 10px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-strong); background: var(--card);
+  text-align: center; cursor: pointer; transition: all .18s;
+  font-size: 12px; font-weight: 500; color: var(--text-2);
+}
+.banca-card:hover { border-color: var(--accent); color: var(--accent); }
+.banca-card.ativa { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+.nivel-btn {
+  padding: 8px 18px; border-radius: 20px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--card); font-size: 13px;
+  cursor: pointer; transition: all .18s; color: var(--text-2);
+}
+.nivel-btn:hover { border-color: var(--accent); }
+.nivel-btn.ativo { border-color: var(--accent); background: var(--accent-grad); color: #fff; }
+
+/* ═══════════════ AUTH SCREEN ═══════════════ */
+#auth-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+#auth-screen.hidden { display: none; }
+
+.auth-box {
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 40px 36px;
+  width: 100%; max-width: 420px;
+  box-shadow: var(--shadow-md);
+}
+.auth-logo {
+  text-align: center; margin-bottom: 28px;
+}
+.auth-logo h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px; font-weight: 400;
+  background: var(--accent-grad);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.auth-logo p { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+
+.auth-tabs {
+  display: flex; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+}
+.auth-tab {
+  flex: 1; text-align: center; padding: 10px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  color: var(--text-3); border-bottom: 2px solid transparent;
+  transition: all .15s; margin-bottom: -1px;
+}
+.auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 16px 0; color: var(--text-3); font-size: 12px;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border-strong);
+}
+
+.btn-google {
+  width: 100%; padding: 11px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-strong); background: var(--card);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-size: 14px; font-weight: 500; cursor: pointer; color: var(--text);
+  transition: all .15s; font-family: 'DM Sans', sans-serif;
+}
+.btn-google:hover { background: var(--bg); border-color: var(--accent); }
+.btn-google svg { width: 18px; height: 18px; }
+
+.auth-error {
+  background: var(--red-light); color: var(--red);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+  font-size: 13px; margin-bottom: 14px; display: none;
+}
+.auth-error.show { display: block; }
+
+/* User avatar no topbar */
+.user-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent-grad); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  flex-shrink: 0; border: none;
+  position: relative;
+}
+.user-menu {
+  position: absolute; top: 44px; right: 0;
+  background: var(--card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); box-shadow: var(--shadow-md);
+  min-width: 200px; padding: 8px; z-index: 100; display: none;
+}
+.user-menu.show { display: block; }
+.user-menu-item {
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  font-size: 13px; cursor: pointer; color: var(--text);
+  display: flex; align-items: center; gap: 10px;
+  transition: background .12s;
+}
+.user-menu-item:hover { background: var(--bg); }
+.user-menu-item.danger { color: var(--red); }
+
+.sync-indicator {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #22c55e; display: inline-block; margin-left: 6px;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.2);
+}
+.sync-indicator.syncing {
+  background: var(--amber); animation: pulse 1s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+
+/* Overlay escuro ao abrir sidebar no mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 40;
+}
+.sidebar-overlay.show { display: block; }
+
+/* Botão hambúrguer — só aparece no mobile */
+.btn-hamburger {
+  display: none;
+  padding: 6px;
+  background: none;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text);
+  margin-right: 4px;
+}
+
+/* Barra de navegação inferior mobile */
+.mobile-nav {
+  display: none;
+}
+
+/* ── Tablet (≤ 900px) ── */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0; bottom: 0;
+    width: 240px;
+    z-index: 50;
+    transition: left .25s cubic-bezier(.4,0,.2,1);
+    box-shadow: none;
+  }
+  .sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+  }
+  .btn-hamburger { display: flex; align-items: center; justify-content: center; }
+  .app { flex-direction: column; }
+  .main { width: 100%; }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+  .content { padding: 20px 16px; }
+  .topbar { padding: 12px 16px; }
+}
+
+/* ── Mobile (≤ 600px) ── */
+@media (max-width: 600px) {
+  /* Layout geral */
+  .app { height: 100dvh; }
+  .main { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  .content {
+    padding: 16px 12px 80px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Topbar compacta */
+  .topbar {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .topbar h2 { font-size: 17px; }
+  .topbar p { display: none; }
+  /* Esconder botões de texto no mobile, manter só ícones */
+  .topbar .btn-text { display: none; }
+  .topbar .btn-sm { padding: 7px 10px; }
+
+  /* Barra de nav inferior (mobile bottom nav) */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--card);
+    border-top: 0.5px solid var(--border-strong);
+    z-index: 30;
+    padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  }
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 4px;
+    cursor: pointer;
+    color: var(--text-3);
+    font-size: 10px;
+    transition: color .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-nav-item.active { color: var(--accent); }
+  .mobile-nav-item svg { width: 20px; height: 20px; }
+
+  /* Grids */
+  .metric-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .grid-2 { grid-template-columns: 1fr; gap: 12px; }
+  .grid-3 { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Cards */
+  .card { padding: 14px; }
+  .metric-card { padding: 14px; }
+  .metric-value { font-size: 22px; }
+  .section-title { font-size: 15px; margin-bottom: 12px; }
+
+  /* Timer */
+  .timer-huge { font-size: 52px; margin: 16px 0; }
+  .timer-controls { flex-wrap: wrap; }
+
+  /* Pomodoro */
+  .pomo-display { font-size: 44px; }
+
+  /* Modal */
+  .modal { padding: 20px 16px; width: 95vw; }
+  .modal-title { font-size: 17px; }
+
+  /* Charts menor */
+  #chart-pizza { max-height: 180px; }
+
+  /* AI Chat */
+  .ai-chat-wrap { height: calc(100dvh - 130px); }
+  .ai-bubble { max-width: 90%; font-size: 13px; }
+  .ai-suggestions { gap: 6px; }
+  .ai-suggestion { font-size: 11px; padding: 5px 10px; }
+
+  /* Concurso cards */
+  .concurso-card { padding: 14px; }
+
+  /* Histórico filtros empilhados */
+  .topbar > div:last-child { flex-wrap: wrap; }
+
+  /* Esconder texto em alguns botões da topbar */
+  #btn-notif-text, #btn-sessao-text { display: none; }
+}
+
+/* ── Muito pequeno (≤ 360px) ── */
+@media (max-width: 360px) {
+  .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-value { font-size: 20px; }
+  .timer-huge { font-size: 42px; }
+  .content { padding: 12px 10px 80px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     TELA DE LOGIN / CADASTRO
+════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <h1>StudyFlow</h1>
+      <p>Seu planejador de concursos públicos</p>
+    </div>
+
+    <!-- Tabs Login / Cadastro -->
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login-btn" onclick="authTab('login')">Entrar</div>
+      <div class="auth-tab" id="tab-cadastro-btn" onclick="authTab('cadastro')">Criar conta</div>
+    </div>
+
+    <!-- Erro -->
+    <div class="auth-error" id="auth-error"></div>
+
+    <!-- Login com Google -->
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Continuar com Google
+    </button>
+
+    <div class="auth-divider">ou</div>
+
+    <!-- Form Login -->
+    <div id="form-login">
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')fazerLogin()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')fazerLogin()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;margin-top:4px" onclick="fazerLogin()" id="btn-login">
+        Entrar
+      </button>
+      <div style="text-align:center;margin-top:14px">
+        <span style="font-size:12px;color:var(--text-3);cursor:pointer;text-decoration:underline" onclick="authTab('recuperar')">Esqueci minha senha</span>
+      </div>
+    </div>
+
+    <!-- Form Recuperar Senha -->
+    <div id="form-recuperar" style="display:none">
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">Digite seu e-mail e enviaremos um link para redefinir sua senha.</p>
+      <div class="form-group">
+        <label class="form-label">E-mail cadastrado</label>
+        <input type="email" id="rec-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')recuperarSenha()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px" onclick="recuperarSenha()" id="btn-recuperar">
+        Enviar link de recuperação
+      </button>
+      <div style="text-align:center;margin-top:14px">
+        <span style="font-size:12px;color:var(--text-3);cursor:pointer;text-decoration:underline" onclick="authTab('login')">← Voltar ao login</span>
+      </div>
+    </div>
+
+    <!-- Form Cadastro -->
+    <div id="form-cadastro" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Nome completo</label>
+        <input type="text" id="cad-nome" placeholder="Seu nome">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input type="email" id="cad-email" placeholder="seu@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha (mínimo 6 caracteres)</label>
+        <input type="password" id="cad-senha" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;margin-top:4px" onclick="fazerCadastro()" id="btn-cadastro">
+        Criar conta gratuita
+      </button>
+    </div>
+
+    <p style="text-align:center;font-size:11px;color:var(--text-3);margin-top:20px">
+      Seus dados ficam seguros e privados. Cada usuário acessa apenas seu próprio painel.
+    </p>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h1>StudyFlow</h1>
+      <p>Planejador de estudos</p>
+      <span style="font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:0.5px">v1.5</span>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">Principal</div>
+      <div class="nav-item active" onclick="goTab('dashboard')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" onclick="goTab('concursos')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Concursos
+      </div>
+      <div class="nav-item" onclick="goTab('timer')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+        Cronômetro
+      </div>
+      <div class="nav-item" onclick="goTab('pomodoro')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2 2"/><path d="M12 3v2M12 19v2M3 12H1M23 12h-2"/></svg>
+        Pomodoro
+      </div>
+
+      <div class="nav-section">Análise</div>
+      <div class="nav-item" onclick="goTab('historico')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Histórico
+      </div>
+      <div class="nav-item" onclick="goTab('metas')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        Metas
+      </div>
+      <div class="nav-item" onclick="goTab('exportar')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar
+      </div>
+
+      <div class="nav-section">Ferramentas</div>
+      <div class="nav-item" onclick="goTab('simulados')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Simulados
+        <span style="margin-left:auto;font-size:9px;background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:10px;letter-spacing:0.5px">NOVO</span>
+      </div>
+      <div class="nav-item" onclick="goTab('ia')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg>
+        Tutor IA
+        <span style="margin-left:auto;font-size:9px;background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:10px;letter-spacing:0.5px">NOVO</span>
+      </div>
+      <div class="nav-item" onclick="goTab('sobre')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Sobre
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Tema do painel</div>
+      <div id="theme-picker" style="display:flex;gap:7px;padding:0 4px;margin-bottom:16px;flex-wrap:wrap">
+        <div class="theme-swatch active" data-theme="forest" style="background:linear-gradient(135deg,#2d6a4f,#52b788)" title="Floresta" onclick="setTheme('forest')"></div>
+        <div class="theme-swatch" data-theme="ocean" style="background:linear-gradient(135deg,#1e4b8f,#4895ef)" title="Oceano" onclick="setTheme('ocean')"></div>
+        <div class="theme-swatch" data-theme="dusk" style="background:linear-gradient(135deg,#5b3b8c,#9d4edd)" title="Crepúsculo" onclick="setTheme('dusk')"></div>
+        <div class="theme-swatch" data-theme="ember" style="background:linear-gradient(135deg,#b5451b,#f4845f)" title="Brasa" onclick="setTheme('ember')"></div>
+        <div class="theme-swatch" data-theme="slate" style="background:linear-gradient(135deg,#374151,#6b7280)" title="Ardósia" onclick="setTheme('slate')"></div>
+        <div class="theme-swatch" data-theme="dark" style="background:linear-gradient(135deg,#0f1117,#1e2433);border:1px solid rgba(255,255,255,0.2)" title="Dark" onclick="setTheme('dark')"></div>
+      </div>
+      <button onclick="verFraseDia()" style="width:100%;padding:8px 12px;margin-bottom:14px;background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);color:rgba(255,255,255,0.6);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
+        <span style="font-size:14px">✦</span> Frase do dia
+      </button>
+      <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Concursos ativos</div>
+      <div id="sidebar-concursos">
+        <div style="font-size:12px;color:rgba(255,255,255,0.3);padding:4px 10px">Nenhum ainda</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn-hamburger" onclick="toggleSidebar()" aria-label="Menu">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <h2 id="topbar-title">Dashboard</h2>
+          <p id="topbar-date"></p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm" onclick="requestNotifPermission()" title="Notificações">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="btn-notif-text">Notificações</span>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-sessao')" title="Registrar sessão">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="btn-sessao-text">Registrar sessão</span>
+        </button>
+        <div style="position:relative">
+          <button class="user-avatar" id="user-avatar-btn" onclick="toggleUserMenu()" title="Minha conta">
+            <span id="user-initials">?</span>
+          </button>
+          <div class="user-menu" id="user-menu">
+            <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);margin-bottom:4px">
+              <div style="font-size:13px;font-weight:500" id="menu-user-name">Carregando...</div>
+              <div style="font-size:11px;color:var(--text-3)" id="menu-user-email"></div>
+              <div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3)">
+                <span class="sync-indicator" id="sync-dot"></span>
+                <span id="sync-label">Sincronizado</span>
+              </div>
+            </div>
+            <div class="user-menu-item" onclick="openModal('modal-minha-conta');toggleUserMenu()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Minha conta
+            </div>
+            <div class="user-menu-item" onclick="goTab('sobre');toggleUserMenu()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Sobre o sistema
+            </div>
+            <div class="user-menu-item danger" onclick="fazerLogout()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Sair da conta
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div id="tab-dashboard" class="tab-page active">
+        <div class="metric-grid">
+          <div class="metric-card green">
+            <div class="metric-label">Total estudado</div>
+            <div class="metric-value" id="m-total">0h</div>
+            <div class="metric-sub" id="m-total-sub">—</div>
+          </div>
+          <div class="metric-card blue">
+            <div class="metric-label">Esta semana</div>
+            <div class="metric-value" id="m-week">0h</div>
+            <div class="metric-sub" id="m-week-sub">—</div>
+          </div>
+          <div class="metric-card amber">
+            <div class="metric-label">Sessões</div>
+            <div class="metric-value" id="m-sessoes">0</div>
+            <div class="metric-sub" id="m-avg">Média —</div>
+          </div>
+          <div class="metric-card purple">
+            <div class="metric-label">Concursos</div>
+            <div class="metric-value" id="m-concursos">0</div>
+            <div class="metric-sub" id="m-materias-count">0 matérias</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="section-title">Distribuição por matéria</div>
+            <div style="position:relative;height:220px"><canvas id="chart-pizza"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="section-title">Progresso por concurso</div>
+            <div id="dash-progress"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="section-title">Horas estudadas — últimos 14 dias</div>
+          <div style="position:relative;height:170px"><canvas id="chart-dias"></canvas></div>
+        </div>
+
+        <div class="grid-2" style="margin-top:20px">
+          <div class="card">
+            <div class="section-title">Sessões recentes</div>
+            <div id="dash-recentes"></div>
+          </div>
+          <div class="card">
+            <div class="section-title">Meta semanal</div>
+            <div id="dash-metas-semana"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONCURSOS -->
+      <div id="tab-concursos" class="tab-page">
+        <div class="grid-2">
+          <div>
+            <div class="card" style="margin-bottom:20px">
+              <div class="section-title">Novo concurso</div>
+              <div class="form-group">
+                <label class="form-label">Nome do concurso</label>
+                <input type="text" id="c-nome" placeholder="Ex: Receita Federal 2025">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Data da prova</label>
+                <input type="date" id="c-data">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Meta de horas semanais</label>
+                <input type="number" id="c-meta" placeholder="Ex: 20" min="1" max="168">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cor identificadora</label>
+                <select id="c-cor">
+                  <option value="accent">Verde</option>
+                  <option value="blue">Azul</option>
+                  <option value="purple">Roxo</option>
+                  <option value="amber">Âmbar</option>
+                  <option value="teal">Teal</option>
+                  <option value="accent-2">Coral</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" style="width:100%" onclick="addConcurso()">Adicionar concurso</button>
+            </div>
+
+            <div class="card">
+              <div class="section-title">Adicionar matéria</div>
+              <div class="form-group">
+                <label class="form-label">Concurso</label>
+                <select id="m-concurso-sel">
+                  <option value="">Selecione um concurso...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nome da matéria</label>
+                <input type="text" id="m-nome" placeholder="Ex: Português, Direito Constitucional...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Meta total de horas</label>
+                <input type="number" id="m-meta" placeholder="Ex: 60" min="1">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Prioridade</label>
+                <select id="m-prio">
+                  <option value="alta">Alta</option>
+                  <option value="media">Média</option>
+                  <option value="baixa">Baixa</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" style="width:100%" onclick="addMateria()">Adicionar matéria</button>
+            </div>
+          </div>
+
+          <div id="lista-concursos">
+            <div class="empty-state">
+              <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <p>Nenhum concurso cadastrado ainda.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMER -->
+      <div id="tab-timer" class="tab-page">
+        <div style="max-width:540px;margin:0 auto">
+          <div class="card" style="text-align:center">
+            <div class="section-title" style="text-align:left">Cronômetro de estudo</div>
+            <div class="grid-2" style="margin-bottom:16px;text-align:left">
+              <div class="form-group">
+                <label class="form-label">Concurso</label>
+                <select id="t-concurso" onchange="updateTimerMaterias()">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Matéria</label>
+                <select id="t-materia">
+                  <option value="">Selecione o concurso</option>
+                </select>
+              </div>
+            </div>
+            <div class="timer-huge" id="timer-display">00:00:00</div>
+            <div class="timer-controls">
+              <button class="btn btn-primary" id="btn-start" onclick="startTimer()">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Iniciar
+              </button>
+              <button class="btn" id="btn-pause" onclick="pauseTimer()" style="display:none">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                Pausar
+              </button>
+              <button class="btn" id="btn-resume" onclick="resumeTimer()" style="display:none">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Retomar
+              </button>
+              <button class="btn btn-primary" id="btn-stop" onclick="stopTimerFlow()" style="display:none;background:var(--accent-2)">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                Finalizar
+              </button>
+            </div>
+            <div class="form-group" style="text-align:left">
+              <label class="form-label">Anotações da sessão (opcional)</label>
+              <textarea id="t-nota" placeholder="O que você estudou? Capítulos, tópicos..."></textarea>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:20px">
+            <div class="section-title">Registro manual</div>
+            <div class="grid-3" style="margin-bottom:12px">
+              <div class="form-group">
+                <label class="form-label">Horas</label>
+                <input type="number" id="manual-h" placeholder="0" min="0" max="23">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Minutos</label>
+                <input type="number" id="manual-m" placeholder="0" min="0" max="59">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Data</label>
+                <input type="date" id="manual-data">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Concurso</label>
+              <select id="manual-concurso" onchange="updateManualMaterias()"><option value="">Selecione...</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Matéria</label>
+              <select id="manual-materia"><option value="">Selecione o concurso</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Anotações</label>
+              <textarea id="manual-nota" placeholder="Opcional..." rows="2"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveManual()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              Salvar sessão manual
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- POMODORO -->
+      <div id="tab-pomodoro" class="tab-page">
+        <div style="max-width:480px;margin:0 auto">
+          <div class="card" style="text-align:center">
+            <div class="section-title" style="text-align:left;margin-bottom:0">Técnica Pomodoro</div>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:20px;text-align:left">25min foco · 5min pausa · A cada 4 ciclos, pausa longa de 15min</p>
+
+            <div class="pomo-label" id="pomo-label">Foco</div>
+            <div class="pomo-display" id="pomo-display">25:00</div>
+            <div class="pomo-dots" id="pomo-dots"></div>
+
+            <div style="display:flex;gap:10px;justify-content:center;margin-bottom:20px">
+              <button class="btn btn-primary" id="pomo-btn" onclick="togglePomo()">Iniciar</button>
+              <button class="btn" onclick="resetPomo()">Reiniciar</button>
+              <button class="btn" onclick="skipPomo()">Pular</button>
+            </div>
+
+            <div class="grid-2" style="text-align:left;margin-bottom:16px">
+              <div class="form-group">
+                <label class="form-label">Concurso</label>
+                <select id="pomo-concurso" onchange="updatePomoMaterias()"><option value="">Selecione...</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Matéria</label>
+                <select id="pomo-materia"><option value="">Selecione o concurso</option></select>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:16px;justify-content:center;text-align:center">
+              <div>
+                <div style="font-size:24px;font-weight:600;font-family:'DM Serif Display',serif" id="pomo-ciclos">0</div>
+                <div style="font-size:11px;color:var(--text-3)">Ciclos hoje</div>
+              </div>
+              <div>
+                <div style="font-size:24px;font-weight:600;font-family:'DM Serif Display',serif" id="pomo-mins">0min</div>
+                <div style="font-size:11px;color:var(--text-3)">Min. focado hoje</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:20px">
+            <div class="section-title">Configurações Pomodoro</div>
+            <div class="grid-3">
+              <div class="form-group">
+                <label class="form-label">Foco (min)</label>
+                <input type="number" id="pomo-cfg-foco" value="25" min="1" max="60" onchange="pomoConfigChange()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pausa curta (min)</label>
+                <input type="number" id="pomo-cfg-pausa" value="5" min="1" max="30" onchange="pomoConfigChange()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pausa longa (min)</label>
+                <input type="number" id="pomo-cfg-longa" value="15" min="5" max="60" onchange="pomoConfigChange()">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTÓRICO -->
+      <div id="tab-historico" class="tab-page">
+        <div class="card" style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:0">Histórico de sessões</div>
+            <div style="display:flex;gap:8px">
+              <select id="h-filtro-c" onchange="renderHistorico()" style="font-size:13px;padding:6px 10px">
+                <option value="">Todos os concursos</option>
+              </select>
+              <select id="h-filtro-m" onchange="renderHistorico()" style="font-size:13px;padding:6px 10px">
+                <option value="">Todas as matérias</option>
+              </select>
+              <select id="h-filtro-periodo" onchange="renderHistorico()" style="font-size:13px;padding:6px 10px">
+                <option value="todos">Todo o período</option>
+                <option value="7">Últimos 7 dias</option>
+                <option value="30">Últimos 30 dias</option>
+                <option value="mes">Este mês</option>
+              </select>
+            </div>
+          </div>
+          <div id="historico-list" style="max-height:400px;overflow-y:auto"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Horas acumuladas por matéria</div>
+          <div id="hist-materias"></div>
+        </div>
+      </div>
+
+      <!-- METAS -->
+      <div id="tab-metas" class="tab-page">
+        <div class="grid-2">
+          <div>
+            <div class="card" style="margin-bottom:20px">
+              <div class="section-title">Meta semanal por concurso</div>
+              <div id="metas-semana-list"></div>
+            </div>
+            <div class="card">
+              <div class="section-title">Meta por matéria</div>
+              <div id="metas-materia-list"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-title">Projeções</div>
+            <div id="metas-projecoes"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXPORTAR -->
+      <div id="tab-exportar" class="tab-page">
+        <div class="grid-2">
+          <div>
+            <div class="card" style="margin-bottom:20px">
+              <div class="section-title">Exportar dados</div>
+              <p style="font-size:13px;color:var(--text-2);margin-bottom:20px">Escolha o formato e o período para exportar seu histórico de estudos.</p>
+
+              <div class="form-group">
+                <label class="form-label">Período</label>
+                <select id="exp-periodo">
+                  <option value="todos">Todo o período</option>
+                  <option value="7">Últimos 7 dias</option>
+                  <option value="30">Últimos 30 dias</option>
+                  <option value="mes">Este mês</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Concurso</label>
+                <select id="exp-concurso">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <button class="btn btn-primary" onclick="exportCSV()">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  Exportar CSV
+                </button>
+                <button class="btn" onclick="exportJSON()">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  Exportar JSON
+                </button>
+                <button class="btn" onclick="exportRelatorio()">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Gerar relatório (imprimir/PDF)
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-title">Importar dados</div>
+              <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">Importe um backup JSON gerado anteriormente pelo StudyFlow.</p>
+              <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="font-size:13px">
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title">Pré-visualização</div>
+            <div id="export-preview"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IA TUTOR -->
+      <div id="tab-ia" class="tab-page">
+        <div class="ai-chat-wrap">
+          <div id="ai-context-bar" class="ai-context-bar" style="display:none">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="ai-context-text"></span>
+          </div>
+
+          <div class="ai-suggestions" id="ai-suggestions">
+            <div class="ai-suggestion" onclick="aiSuggest(this)">Como organizar meus estudos?</div>
+            <div class="ai-suggestion" onclick="aiSuggest(this)">Técnicas de memorização para concursos</div>
+            <div class="ai-suggestion" onclick="aiSuggest(this)">Como usar a técnica Pomodoro?</div>
+            <div class="ai-suggestion" onclick="aiSuggest(this)">Dicas para manter o foco nos estudos</div>
+            <div class="ai-suggestion" onclick="aiSuggest(this)">Como revisar matérias de forma eficiente?</div>
+            <div class="ai-suggestion" onclick="aiSuggest(this)">Analise meu progresso</div>
+          </div>
+
+          <div class="card" style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:20px">
+            <div class="ai-messages" id="ai-messages">
+              <div class="ai-msg">
+                <div class="ai-avatar bot">IA</div>
+                <div class="ai-bubble bot">
+                  <p>Olá! Sou seu <strong>Tutor IA</strong> do StudyFlow. Estou aqui para te ajudar com dúvidas de conteúdo, técnicas de estudo, organização e muito mais.</p>
+                  <p>Posso analisar seu progresso nos concursos cadastrados e dar dicas personalizadas. Como posso te ajudar hoje?</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="ai-input-row">
+              <textarea id="ai-input" placeholder="Pergunte qualquer coisa sobre estudos, conteúdos ou estratégias..." rows="1"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage()}"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+              <button class="ai-send-btn" id="ai-send-btn" onclick="sendAiMessage()">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+              </button>
+            </div>
+            <div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:8px">
+              Enter para enviar · Shift+Enter para nova linha · Powered by Claude
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIMULADOS -->
+      <div id="tab-simulados" class="tab-page">
+
+        <!-- TELA 1: Configuração -->
+        <div id="sim-tela-config" class="sim-config">
+          <div class="card" style="margin-bottom:20px">
+            <div class="section-title">🎯 Novo Simulado com IA</div>
+            <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">A IA gera questões no estilo das bancas com alternativas e gabarito comentado. Escolha as opções abaixo:</p>
+
+            <div class="form-group">
+              <label class="form-label">Disciplina / Matéria</label>
+              <input type="text" id="sim-materia" placeholder="Ex: Português, Direito Constitucional, Matemática, Informática...">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Banca examinadora (opcional)</label>
+              <div class="bancas-grid" id="bancas-grid">
+                <div class="banca-card" data-banca="" onclick="selecionarBanca(this)">Qualquer</div>
+                <div class="banca-card" data-banca="CESPE/CEBRASPE" onclick="selecionarBanca(this)">CESPE</div>
+                <div class="banca-card" data-banca="FCC" onclick="selecionarBanca(this)">FCC</div>
+                <div class="banca-card" data-banca="VUNESP" onclick="selecionarBanca(this)">VUNESP</div>
+                <div class="banca-card" data-banca="FGV" onclick="selecionarBanca(this)">FGV</div>
+                <div class="banca-card" data-banca="CESGRANRIO" onclick="selecionarBanca(this)">CESGRANRIO</div>
+                <div class="banca-card" data-banca="IBFC" onclick="selecionarBanca(this)">IBFC</div>
+                <div class="banca-card" data-banca="QUADRIX" onclick="selecionarBanca(this)">QUADRIX</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Nível de dificuldade</label>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+                <div class="nivel-btn" data-nivel="fácil" onclick="selecionarNivel(this)">Fácil</div>
+                <div class="nivel-btn ativo" data-nivel="médio" onclick="selecionarNivel(this)">Médio</div>
+                <div class="nivel-btn" data-nivel="difícil" onclick="selecionarNivel(this)">Difícil</div>
+                <div class="nivel-btn" data-nivel="misto" onclick="selecionarNivel(this)">Misto</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Quantidade de questões</label>
+              <select id="sim-qtd">
+                <option value="5">5 questões (rápido)</option>
+                <option value="10" selected>10 questões</option>
+                <option value="15">15 questões</option>
+                <option value="20">20 questões</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Concurso de referência (opcional)</label>
+              <select id="sim-concurso-ref">
+                <option value="">Genérico</option>
+              </select>
+            </div>
+
+            <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;font-size:14px" onclick="gerarSimulado()">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Gerar Simulado com IA
+            </button>
+          </div>
+
+          <!-- Histórico de simulados -->
+          <div class="card">
+            <div class="section-title">📊 Histórico de simulados</div>
+            <div id="sim-historico-lista">
+              <div style="text-align:center;padding:32px;color:var(--text-3);font-size:13px">Nenhum simulado realizado ainda.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TELA 2: Carregando -->
+        <div id="sim-tela-loading" style="display:none">
+          <div class="sim-loading">
+            <div class="sim-spinner"></div>
+            <div style="font-size:15px;font-weight:500" id="sim-loading-txt">Gerando questões com IA...</div>
+            <div style="font-size:13px;color:var(--text-3)" id="sim-loading-sub">Isso pode levar alguns segundos</div>
+          </div>
+        </div>
+
+        <!-- TELA 3: Questão atual -->
+        <div id="sim-tela-questao" style="display:none">
+          <div class="sim-question-wrap">
+            <!-- Header progresso -->
+            <div class="card" style="margin-bottom:16px;padding:14px 18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:500" id="sim-q-label">Questão 1 de 10</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span style="font-size:12px;color:var(--text-3)" id="sim-placar">✅ 0 &nbsp; ❌ 0</span>
+                  <button class="btn btn-sm" onclick="encerrarSimulado()">Encerrar</button>
+                </div>
+              </div>
+              <div class="sim-progress-bar">
+                <div class="sim-progress-fill" id="sim-prog-fill" style="width:0%"></div>
+              </div>
+            </div>
+
+            <!-- Corpo da questão -->
+            <div class="card">
+              <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+                <span class="badge badge-blue" id="sim-q-banca" style="font-size:11px"></span>
+                <span class="badge" id="sim-q-nivel" style="font-size:11px;background:var(--amber-light);color:var(--amber)"></span>
+                <span class="badge badge-green" id="sim-q-materia" style="font-size:11px"></span>
+              </div>
+
+              <p style="font-size:15px;line-height:1.7;margin-bottom:20px;font-weight:500" id="sim-q-enunciado"></p>
+
+              <div id="sim-opcoes"></div>
+
+              <div class="sim-gabarito" id="sim-gabarito">
+                <strong style="display:block;margin-bottom:8px">💡 Gabarito comentado:</strong>
+                <span id="sim-gabarito-txt"></span>
+              </div>
+
+              <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end" id="sim-nav-btns">
+                <button class="btn btn-primary" id="sim-btn-confirmar" onclick="confirmarResposta()" style="display:none">
+                  Confirmar resposta
+                </button>
+                <button class="btn btn-primary" id="sim-btn-proxima" onclick="proximaQuestao()" style="display:none">
+                  Próxima questão →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TELA 4: Resultado final -->
+        <div id="sim-tela-resultado" style="display:none">
+          <div class="sim-question-wrap">
+            <div class="card" style="text-align:center;padding:36px 28px;margin-bottom:20px">
+              <div style="font-size:48px;margin-bottom:12px" id="sim-emoji-resultado">🏆</div>
+              <h2 style="font-family:'DM Serif Display',serif;font-size:26px;font-weight:400;margin-bottom:8px" id="sim-resultado-titulo">Parabéns!</h2>
+              <p style="font-size:14px;color:var(--text-3);margin-bottom:28px" id="sim-resultado-sub"></p>
+
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px" id="sim-stats-grid">
+                <div class="sim-stat-box">
+                  <div class="sim-stat-num" id="res-acertos" style="color:#22c55e">0</div>
+                  <div class="sim-stat-label">Acertos</div>
+                </div>
+                <div class="sim-stat-box">
+                  <div class="sim-stat-num" id="res-erros" style="color:#ef4444">0</div>
+                  <div class="sim-stat-label">Erros</div>
+                </div>
+                <div class="sim-stat-box">
+                  <div class="sim-stat-num" id="res-pct" style="color:var(--accent)">0%</div>
+                  <div class="sim-stat-label">Aproveitamento</div>
+                </div>
+                <div class="sim-stat-box">
+                  <div class="sim-stat-num" id="res-tempo" style="color:var(--blue)">0min</div>
+                  <div class="sim-stat-label">Tempo</div>
+                </div>
+              </div>
+
+              <div style="background:var(--bg);border-radius:var(--radius-sm);padding:16px;margin-bottom:24px">
+                <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Aproveitamento</div>
+                <div class="sim-progress-bar" style="height:12px;margin-bottom:4px">
+                  <div class="sim-progress-fill" id="res-barra" style="width:0%"></div>
+                </div>
+                <div style="font-size:13px;color:var(--text-2)" id="res-barra-label"></div>
+              </div>
+
+              <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="novoSimulado()">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.41"/></svg>
+                  Novo simulado
+                </button>
+                <button class="btn" onclick="revisarSimulado()">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Revisar questões
+                </button>
+              </div>
+            </div>
+
+            <!-- Feedback IA -->
+            <div class="card" id="sim-feedback-ia" style="display:none">
+              <div class="section-title">🤖 Análise da IA</div>
+              <div id="sim-feedback-txt" style="font-size:14px;line-height:1.7;color:var(--text-2)"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SOBRE -->
+      <div id="tab-sobre" class="tab-page">
+        <div style="max-width:680px;margin:0 auto">
+
+          <!-- Card autor -->
+          <div class="card" style="margin-bottom:20px;text-align:center;padding:36px 28px">
+            <div style="width:80px;height:80px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-family:'DM Serif Display',serif;font-size:28px;color:#fff;letter-spacing:-1px">VP</div>
+            <h2 style="font-family:'DM Serif Display',serif;font-size:22px;font-weight:400;margin-bottom:4px">Valdenor Pereira do Nascimento Junior</h2>
+            <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Educador · Criador do StudyFlow</p>
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:24px">
+              <span class="badge badge-green">Pedagogia</span>
+              <span class="badge badge-blue">Letras</span>
+              <span class="badge badge-purple">Teologia</span>
+            </div>
+
+            <div style="border-top:0.5px solid var(--border);padding-top:20px;text-align:left">
+              <p style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;font-weight:500">Aprovações em concursos públicos</p>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0"></div>
+                  <span style="font-size:14px">Prefeitura de Santa Luzia do Paruá — <span style="color:var(--text-2)">Concurso Municipal</span></span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0"></div>
+                  <span style="font-size:14px">Polícia Militar de São Paulo — <span style="color:var(--text-2)">Concurso Estadual</span></span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0"></div>
+                  <span style="font-size:14px">Polícia Militar do Maranhão — <span style="color:var(--text-2)">Concurso Estadual</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card sistema -->
+          <div class="card" style="margin-bottom:20px">
+            <div class="section-title">Sobre o StudyFlow</div>
+            <p style="font-size:14px;color:var(--text-2);line-height:1.7;margin-bottom:16px">
+              O StudyFlow nasceu da experiência real de quem já passou por múltiplos processos seletivos. É um sistema de planejamento de estudos pensado para concurseiros que precisam de organização, foco e acompanhamento constante do próprio progresso.
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm)">
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Versão</div>
+                <div style="font-size:16px;font-weight:500">1.5</div>
+              </div>
+              <div style="padding:12px;background:var(--bg);border-radius:var(--radius-sm)">
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Última atualização</div>
+                <div style="font-size:16px;font-weight:500" id="sobre-data-update"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card changelog -->
+          <div class="card">
+            <div class="section-title">Histórico de versões</div>
+            <div style="display:flex;flex-direction:column;gap:0">
+              <div class="list-item">
+                <div style="width:48px;flex-shrink:0"><span class="badge badge-green" style="font-size:10px">v1.5</span></div>
+                <div style="flex:1;font-size:13px"><strong>Atual</strong> — Correção de sincronização com Supabase, recuperação de senha, troca de e-mail e senha no painel do usuário, correção de 6 bugs críticos</div>
+              </div>
+              <div class="list-item">
+                <div style="width:48px;flex-shrink:0"><span class="badge badge-blue" style="font-size:10px">v1.4</span></div>
+                <div style="flex:1;font-size:13px">Sistema online com Supabase: cadastro de usuários, login com e-mail/senha e Google, painel personalizado por usuário, sincronização em nuvem</div>
+              </div>
+              <div class="list-item">
+                <div style="width:48px;flex-shrink:0"><span class="badge badge-blue" style="font-size:10px">v1.3</span></div>
+                <div style="flex:1;font-size:13px">Módulo de Simulados com IA: geração de questões por matéria/banca, gabarito comentado, placar, histórico e análise de desempenho</div>
+              </div>
+              <div class="list-item">
+                <div style="width:48px;flex-shrink:0"><span class="badge badge-blue" style="font-size:10px">v1.2</span></div>
+                <div style="flex:1;font-size:13px">Tema Dark, gradientes em todos os temas e elementos visuais</div>
+              </div>
+              <div class="list-item">
+                <div style="width:48px;flex-shrink:0"><span class="badge badge-blue" style="font-size:10px">v1.1</span></div>
+                <div style="flex:1;font-size:13px">Tutor IA, seletor de temas, responsivo mobile, aba Sobre, frases motivacionais</div>
+              </div>
+              <div class="list-item">
+                <div style="width:48px;flex-shrink:0"><span class="badge" style="font-size:10px;background:var(--bg);color:var(--text-2)">v1.0</span></div>
+                <div style="flex:1;font-size:13px">Lançamento — Dashboard, Concursos, Cronômetro, Pomodoro, Histórico, Metas, Exportar</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="mobile-nav" id="mobile-nav">
+  <div class="mobile-nav-item active" onclick="mobileGoTab('dashboard',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Início
+  </div>
+  <div class="mobile-nav-item" onclick="mobileGoTab('concursos',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Concursos
+  </div>
+  <div class="mobile-nav-item" onclick="mobileGoTab('timer',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+    Timer
+  </div>
+  <div class="mobile-nav-item" onclick="mobileGoTab('historico',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Histórico
+  </div>
+  <div class="mobile-nav-item" onclick="mobileGoTab('ia',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg>
+    Tutor IA
+  </div>
+</nav>
+
+<!-- MODAL: registrar sessão rápida -->
+<div class="modal-overlay" id="modal-sessao" onclick="closeModalOutside(event,'modal-sessao')">
+  <div class="modal">
+    <div class="modal-title">Registrar sessão</div>
+    <div class="form-group">
+      <label class="form-label">Concurso</label>
+      <select id="ms-concurso" onchange="updateMsSel()"><option value="">Selecione...</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Matéria</label>
+      <select id="ms-materia"><option value="">Selecione o concurso</option></select>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Horas</label>
+        <input type="number" id="ms-h" placeholder="0" min="0" max="23">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Minutos</label>
+        <input type="number" id="ms-m" placeholder="0" min="0" max="59">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Data</label>
+      <input type="date" id="ms-data">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Anotações</label>
+      <textarea id="ms-nota" rows="2" placeholder="Opcional..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="btn" onclick="closeModal('modal-sessao')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveModalSession()">Salvar sessão</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Minha Conta -->
+<div class="modal-overlay" id="modal-minha-conta" onclick="closeModalOutside(event,'modal-minha-conta')">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Minha Conta
+    </div>
+
+    <!-- Abas -->
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">
+      <div class="auth-tab active" id="conta-tab-email-btn" onclick="contaTab('email')" style="color:var(--text-2)">Trocar e-mail</div>
+      <div class="auth-tab" id="conta-tab-senha-btn" onclick="contaTab('senha')" style="color:var(--text-2)">Trocar senha</div>
+    </div>
+
+    <div id="conta-msg" style="display:none;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px"></div>
+
+    <!-- Trocar e-mail -->
+    <div id="conta-form-email">
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Um e-mail de confirmação será enviado para o novo endereço.</p>
+      <div class="form-group">
+        <label class="form-label">Novo e-mail</label>
+        <input type="email" id="conta-novo-email" placeholder="novo@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirme o novo e-mail</label>
+        <input type="email" id="conta-conf-email" placeholder="novo@email.com">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+        <button class="btn" onclick="closeModal('modal-minha-conta')">Cancelar</button>
+        <button class="btn btn-primary" onclick="trocarEmail()" id="btn-trocar-email">Salvar novo e-mail</button>
+      </div>
+    </div>
+
+    <!-- Trocar senha -->
+    <div id="conta-form-senha" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Nova senha</label>
+        <input type="password" id="conta-nova-senha" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmar nova senha</label>
+        <input type="password" id="conta-conf-senha" placeholder="Repita a nova senha">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+        <button class="btn" onclick="closeModal('modal-minha-conta')">Cancelar</button>
+        <button class="btn btn-primary" onclick="trocarSenha()" id="btn-trocar-senha">Salvar nova senha</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIF -->
+<div class="notif-banner" id="notif"></div>
+
+<!-- MODAL: frase motivacional de boas-vindas -->
+<div class="modal-overlay" id="modal-frase" onclick="closeModalOutside(event,'modal-frase')">
+  <div class="modal" style="max-width:520px;text-align:center">
+    <div style="font-size:32px;margin-bottom:12px">✦</div>
+    <p style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px">Frase do dia</p>
+    <blockquote id="frase-texto" style="font-family:'DM Serif Display',serif;font-size:20px;line-height:1.5;color:var(--text);font-style:italic;margin-bottom:16px;padding:0 8px"></blockquote>
+    <p id="frase-autor" style="font-size:13px;color:var(--text-3);margin-bottom:28px"></p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:14px;padding:12px" onclick="closeModal('modal-frase')">
+      Bora estudar! 🎯
+    </button>
+    <p style="font-size:11px;color:var(--text-3);margin-top:12px">StudyFlow v1.5 · por Valdenor Pereira do Nascimento Junior</p>
+  </div>
+</div>
+
+<script>
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let st = { concursos: [], sessoes: [] };
+let appInitialized = false; // BUG FIX: evita dupla inicialização
+
+const COR_MAP = {
+  accent:   { hex:'#2d6a4f', light:'#e8f5ef', text:'#1a4035' },
+  blue:     { hex:'#1e4b8f', light:'#e8eef8', text:'#0d2a5c' },
+  purple:   { hex:'#5b3b8c', light:'#f0eafa', text:'#3a2260' },
+  amber:    { hex:'#92600a', light:'#fdf5e6', text:'#6b4508' },
+  teal:     { hex:'#0d6e6e', light:'#e5f5f5', text:'#084f4f' },
+  'accent-2': { hex:'#b5451b', light:'#fdf0ec', text:'#7d2f12' },
+};
+
+// BUG FIX: UUID generator para IDs compatíveis com Supabase
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function load() {
+  try {
+    const s = localStorage.getItem('studyflow_v2');
+    if (s) st = {...st, ...JSON.parse(s)};
+  } catch(e) {}
+}
+
+function save() {
+  try { localStorage.setItem('studyflow_v2', JSON.stringify(st)); } catch(e) {}
+}
+
+// ─── UTILS ─────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtHM(mins) {
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
+function fmtSec(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  return Math.max(0, Math.floor((new Date(dateStr+'T12:00:00') - new Date()) / 86400000));
+}
+function weekStart() {
+  const d = new Date(); d.setDate(d.getDate() - d.getDay());
+  return d.toISOString().split('T')[0];
+}
+function sessoesByConc(cid) { return st.sessoes.filter(s => s.concursoId === cid); }
+function sessoesByMat(cid, mid) { return st.sessoes.filter(s => s.concursoId === cid && s.materiaId === mid); }
+function totalMins(arr) { return arr.reduce((a, s) => a + s.duracao, 0); }
+function pct(v, max) { return max ? Math.min(100, Math.round(v / max * 100)) : 0; }
+
+function notify(msg, type='success') {
+  const n = document.getElementById('notif');
+  n.textContent = msg; n.className = `notif-banner ${type} show`;
+  setTimeout(() => n.classList.remove('show'), 3200);
+}
+
+function openModal(id) {
+  populateAllSelects();
+  document.getElementById('ms-data').value = today();
+  document.getElementById(id).classList.add('show');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function closeModalOutside(e, id) { if (e.target.classList.contains('modal-overlay')) closeModal(id); }
+
+// ─── NAV ───────────────────────────────────────────────────────────────────
+const TAB_TITLES = {
+  dashboard:'Dashboard', concursos:'Concursos', timer:'Cronômetro',
+  pomodoro:'Pomodoro', historico:'Histórico', metas:'Metas & Projeções',
+  exportar:'Exportar dados', simulados:'Simulados & Questões', ia:'Tutor IA', sobre:'Sobre'
+};
+
+function goTab(id) {
+  document.querySelectorAll('.tab-page').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+  document.getElementById('topbar-title').textContent = TAB_TITLES[id] || id;
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'historico') renderHistorico();
+  if (id === 'metas') renderMetas();
+  if (id === 'concursos') renderConcursos();
+  if (id === 'exportar') renderExport();
+  if (id === 'ia') {
+    const bar = document.getElementById('ai-context-bar');
+    const txt = document.getElementById('ai-context-text');
+    if (st.concursos.length) {
+      bar.style.display = 'flex';
+      txt.textContent = `Contexto carregado: ${st.concursos.length} concurso(s), ${st.sessoes.length} sessão(ões). A IA conhece seu progresso atual.`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+  populateAllSelects();
+}
+
+// Fix nav clicks properly
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// ─── CONCURSOS ─────────────────────────────────────────────────────────────
+function addConcurso() {
+  const nome = document.getElementById('c-nome').value.trim();
+  if (!nome) return notify('Digite o nome do concurso.', 'warning');
+  st.concursos.push({
+    id: generateUUID(),
+    nome,
+    dataProva: document.getElementById('c-data').value,
+    metaSemanal: parseInt(document.getElementById('c-meta').value) || 0,
+    cor: document.getElementById('c-cor').value,
+    materias: []
+  });
+  ['c-nome','c-data','c-meta'].forEach(id => document.getElementById(id).value = '');
+  syncSave(); renderConcursos(); renderSidebar(); populateAllSelects();
+  notify(`Concurso "${nome}" adicionado!`);
+}
+
+function addMateria() {
+  const cid = document.getElementById('m-concurso-sel').value;
+  const nome = document.getElementById('m-nome').value.trim();
+  if (!cid) return notify('Selecione um concurso.', 'warning');
+  if (!nome) return notify('Digite o nome da matéria.', 'warning');
+  const c = st.concursos.find(x => String(x.id) === String(cid));
+  if (!c) return;
+  c.materias.push({
+    id: generateUUID(), nome,
+    metaHoras: parseInt(document.getElementById('m-meta').value) || 0,
+    prioridade: document.getElementById('m-prio').value
+  });
+  ['m-nome','m-meta'].forEach(id => document.getElementById(id).value = '');
+  syncSave(); renderConcursos(); populateAllSelects();
+  notify(`Matéria "${nome}" adicionada!`);
+}
+
+function deleteConcurso(id) {
+  if (!confirm('Remover este concurso e todas as suas sessões?')) return;
+  st.concursos = st.concursos.filter(c => String(c.id) !== String(id));
+  st.sessoes = st.sessoes.filter(s => String(s.concursoId) !== String(id));
+  syncSave(); renderConcursos(); renderSidebar(); populateAllSelects();
+  notify('Concurso removido.', 'info');
+}
+
+function deleteMateria(cid, mid) {
+  const c = st.concursos.find(x => String(x.id) === String(cid));
+  if (!c) return;
+  c.materias = c.materias.filter(m => String(m.id) !== String(mid));
+  st.sessoes = st.sessoes.filter(s => !(String(s.concursoId) === String(cid) && String(s.materiaId) === String(mid)));
+  syncSave(); renderConcursos(); populateAllSelects();
+}
+
+function deleteSessao(id) {
+  st.sessoes = st.sessoes.filter(s => String(s.id) !== String(id));
+  syncSave(); renderHistorico(); renderDashboard();
+  notify('Sessão removida.', 'info');
+}
+
+function renderConcursos() {
+  const el = document.getElementById('lista-concursos');
+  if (!st.concursos.length) {
+    el.innerHTML = '<div class="empty-state"><svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><p>Nenhum concurso cadastrado.</p></div>';
+    return;
+  }
+  el.innerHTML = st.concursos.map(c => {
+    const col = COR_MAP[c.cor] || COR_MAP.accent;
+    const dias = daysUntil(c.dataProva);
+    const prioColor = { alta:'badge-red', media:'badge-amber', baixa:'badge-green' };
+    const materiasHtml = c.materias.map(m => {
+      const mins = totalMins(sessoesByMat(c.id, m.id));
+      const p = pct(mins / 60, m.metaHoras);
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>${m.nome} <span class="badge ${prioColor[m.prioridade]||'badge-green'}" style="font-size:10px">${m.prioridade}</span></span>
+          <span style="color:var(--text-3)">${fmtHM(mins)} / ${m.metaHoras}h</span>
+          <button class="btn-icon" style="margin-left:4px" onclick="deleteMateria(${c.id},${m.id})">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:${p}%;background:${col.hex}"></div></div>
+      </div>`;
+    }).join('') || '<p style="font-size:13px;color:var(--text-3)">Nenhuma matéria ainda.</p>';
+
+    return `<div class="concurso-card" style="border-left-color:${col.hex}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <span style="font-weight:600;font-size:16px">${c.nome}</span>
+          ${dias !== null ? `<span class="badge badge-blue" style="margin-left:8px">${dias} dias</span>` : ''}
+          ${c.metaSemanal ? `<span class="chip" style="margin-left:6px">${c.metaSemanal}h/sem</span>` : ''}
+        </div>
+        <button class="btn-icon" onclick="deleteConcurso(${c.id})">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+      ${materiasHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar-concursos');
+  if (!st.concursos.length) {
+    el.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,0.3);padding:4px 10px">Nenhum ainda</div>';
+    return;
+  }
+  el.innerHTML = st.concursos.map(c => {
+    const col = COR_MAP[c.cor] || COR_MAP.accent;
+    const dias = daysUntil(c.dataProva);
+    return `<div class="concurso-pill">
+      <div class="dot" style="background:${col.hex}"></div>
+      <span>${c.nome}</span>
+      ${dias !== null ? `<span class="days">${dias}d</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ─── SELECTS ────────────────────────────────────────────────────────────────
+function populateAllSelects() {
+  const ids = ['m-concurso-sel','t-concurso','manual-concurso','pomo-concurso','ms-concurso','h-filtro-c','exp-concurso'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    const isFilter = id.startsWith('h-') || id.startsWith('exp-');
+    el.innerHTML = isFilter ? '<option value="">Todos os concursos</option>' : '<option value="">Selecione...</option>';
+    st.concursos.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.nome; el.appendChild(o);
+    });
+    if (prev) el.value = prev;
+  });
+
+  // History materia filter
+  const hfm = document.getElementById('h-filtro-m');
+  if (hfm) {
+    const prev = hfm.value;
+    hfm.innerHTML = '<option value="">Todas as matérias</option>';
+    const allM = [...new Set(st.sessoes.map(s => s.materia))];
+    allM.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; hfm.appendChild(o); });
+    if (prev) hfm.value = prev;
+  }
+
+  updateTimerMaterias();
+  updateManualMaterias();
+  updatePomoMaterias();
+}
+
+function updateTimerMaterias() { updateMateriasSel('t-concurso', 't-materia'); }
+function updateManualMaterias() { updateMateriasSel('manual-concurso', 'manual-materia'); }
+function updatePomoMaterias() { updateMateriasSel('pomo-concurso', 'pomo-materia'); }
+function updateMsSel() { updateMateriasSel('ms-concurso', 'ms-materia'); }
+
+function updateMateriasSel(cSel, mSel) {
+  const cid = parseInt(document.getElementById(cSel)?.value);
+  const sel = document.getElementById(mSel);
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (!cid) { sel.innerHTML = '<option value="">Selecione o concurso</option>'; return; }
+  const c = st.concursos.find(x => x.id === cid);
+  if (!c || !c.materias.length) { sel.innerHTML = '<option value="">Nenhuma matéria cadastrada</option>'; return; }
+  c.materias.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.nome; sel.appendChild(o); });
+}
+
+// ─── SAVE SESSION ───────────────────────────────────────────────────────────
+function buildSession(cid, mid, duracao, data, nota) {
+  const c = st.concursos.find(x => String(x.id) === String(cid));
+  const m = c?.materias.find(x => String(x.id) === String(mid));
+  if (!c || !m) return null;
+  return {
+    id: generateUUID(),
+    concursoId: c.id, materiaId: m.id,
+    concurso: c.nome, materia: m.nome,
+    duracao, data: data || today(), nota: nota || ''
+  };
+}
+
+function pushSession(sess) {
+  st.sessoes.push(sess);
+  syncSave();
+  renderDashboard();
+  renderSidebar();
+  checkMetaNotif(sess);
+}
+
+function checkMetaNotif(sess) {
+  const c = st.concursos.find(x => x.id === sess.concursoId);
+  const m = c?.materias.find(x => x.id === sess.materiaId);
+  if (!m || !m.metaHoras) return;
+  const mins = totalMins(sessoesByMat(sess.concursoId, sess.materiaId));
+  const p = mins / 60 / m.metaHoras * 100;
+  if (p >= 100 && p - sess.duracao / 60 / m.metaHoras * 100 < 100) {
+    pushNotif(`🎉 Meta de ${m.nome} concluída!`);
+  } else if (p >= 50 && p - sess.duracao / 60 / m.metaHoras * 100 < 50) {
+    pushNotif(`📚 50% da meta de ${m.nome} atingido!`);
+  }
+}
+
+function pushNotif(msg) {
+  if (Notification.permission === 'granted') {
+    try { new Notification('StudyFlow', { body: msg, icon: '' }); } catch(e) {}
+  }
+  notify(msg, 'success');
+}
+
+function saveManual() {
+  const h = parseInt(document.getElementById('manual-h').value) || 0;
+  const m = parseInt(document.getElementById('manual-m').value) || 0;
+  const duracao = h * 60 + m;
+  if (duracao < 1) return notify('Informe pelo menos 1 minuto.', 'warning');
+  const cid = document.getElementById('manual-concurso').value;
+  const mid = document.getElementById('manual-materia').value;
+  const data = document.getElementById('manual-data').value || today();
+  const nota = document.getElementById('manual-nota').value.trim();
+  const sess = buildSession(cid, mid, duracao, data, nota);
+  if (!sess) return notify('Selecione concurso e matéria.', 'warning');
+  pushSession(sess);
+  ['manual-h','manual-m','manual-nota'].forEach(id => document.getElementById(id).value = '');
+  notify(`Sessão de ${fmtHM(duracao)} salva!`);
+}
+
+function saveModalSession() {
+  const cid = document.getElementById('ms-concurso').value;
+  const mid = document.getElementById('ms-materia').value;
+  const h = parseInt(document.getElementById('ms-h').value) || 0;
+  const m = parseInt(document.getElementById('ms-m').value) || 0;
+  const duracao = h * 60 + m;
+  if (duracao < 1) return notify('Informe pelo menos 1 minuto.', 'warning');
+  const data = document.getElementById('ms-data').value || today();
+  const nota = document.getElementById('ms-nota').value.trim();
+  const sess = buildSession(cid, mid, duracao, data, nota);
+  if (!sess) return notify('Selecione concurso e matéria.', 'warning');
+  pushSession(sess);
+  closeModal('modal-sessao');
+  notify(`Sessão de ${fmtHM(duracao)} salva!`);
+}
+
+// ─── TIMER ──────────────────────────────────────────────────────────────────
+let timerSecs = 0, timerInterval = null, timerStart = null, timerPaused = 0, timerPausedAt = null, timerRunning = false;
+
+function startTimer() {
+  const cid = document.getElementById('t-concurso').value;
+  const mid = document.getElementById('t-materia').value;
+  if (!cid || !mid) return notify('Selecione concurso e matéria.', 'warning');
+  timerSecs = 0; timerRunning = true; timerStart = Date.now(); timerPaused = 0;
+  document.getElementById('btn-start').style.display = 'none';
+  document.getElementById('btn-pause').style.display = '';
+  document.getElementById('btn-stop').style.display = '';
+  timerInterval = setInterval(() => {
+    timerSecs = Math.floor((Date.now() - timerStart - timerPaused) / 1000);
+    document.getElementById('timer-display').textContent = fmtSec(timerSecs);
+  }, 500);
+}
+
+function pauseTimer() {
+  clearInterval(timerInterval); timerPausedAt = Date.now();
+  document.getElementById('btn-pause').style.display = 'none';
+  document.getElementById('btn-resume').style.display = '';
+}
+
+function resumeTimer() {
+  timerPaused += Date.now() - timerPausedAt;
+  document.getElementById('btn-pause').style.display = '';
+  document.getElementById('btn-resume').style.display = 'none';
+  timerInterval = setInterval(() => {
+    timerSecs = Math.floor((Date.now() - timerStart - timerPaused) / 1000);
+    document.getElementById('timer-display').textContent = fmtSec(timerSecs);
+  }, 500);
+}
+
+function stopTimerFlow() {
+  clearInterval(timerInterval); timerRunning = false;
+  const mins = Math.round(timerSecs / 60);
+  if (mins < 1) { notify('Sessão muito curta.', 'warning'); resetTimerUI(); return; }
+  const cid = document.getElementById('t-concurso').value;
+  const mid = document.getElementById('t-materia').value;
+  const nota = document.getElementById('t-nota').value.trim();
+  const sess = buildSession(cid, mid, mins, today(), nota);
+  if (!sess) { resetTimerUI(); return; }
+  pushSession(sess);
+  document.getElementById('t-nota').value = '';
+  resetTimerUI();
+  notify(`Sessão de ${fmtHM(mins)} salva!`);
+}
+
+function resetTimerUI() {
+  timerSecs = 0;
+  document.getElementById('timer-display').textContent = '00:00:00';
+  document.getElementById('btn-start').style.display = '';
+  ['btn-pause','btn-resume','btn-stop'].forEach(id => document.getElementById(id).style.display = 'none');
+}
+
+// ─── POMODORO ───────────────────────────────────────────────────────────────
+let pomoMode = 'foco', pomoCiclos = 0, pomoMinsToday = 0;
+let pomoSecs = 0, pomoInterval = null, pomoRunning = false;
+
+function pomoDuration() {
+  const foco = parseInt(document.getElementById('pomo-cfg-foco').value) || 25;
+  const pausa = parseInt(document.getElementById('pomo-cfg-pausa').value) || 5;
+  const longa = parseInt(document.getElementById('pomo-cfg-longa').value) || 15;
+  if (pomoMode === 'foco') return foco * 60;
+  if (pomoMode === 'longa') return longa * 60;
+  return pausa * 60;
+}
+
+function pomoConfigChange() { if (!pomoRunning) { pomoSecs = pomoDuration(); renderPomoDisplay(); } }
+
+function renderPomoDisplay() {
+  const s = pomoDuration() - pomoSecs;
+  document.getElementById('pomo-display').textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const labels = { foco:'Foco', pausa:'Pausa curta', longa:'Pausa longa' };
+  document.getElementById('pomo-label').textContent = labels[pomoMode];
+  const dots = document.getElementById('pomo-dots');
+  dots.innerHTML = Array.from({length:4},(_,i) => `<div class="pomo-dot ${i < (pomoCiclos % 4) ? 'done' : ''}"></div>`).join('');
+  document.getElementById('pomo-ciclos').textContent = pomoCiclos;
+  document.getElementById('pomo-mins').textContent = `${pomoMinsToday}min`;
+}
+
+function togglePomo() {
+  if (pomoRunning) {
+    clearInterval(pomoInterval); pomoRunning = false;
+    document.getElementById('pomo-btn').textContent = 'Continuar';
+  } else {
+    pomoRunning = true;
+    document.getElementById('pomo-btn').textContent = 'Pausar';
+    pomoInterval = setInterval(() => {
+      pomoSecs++;
+      const remaining = pomoDuration() - pomoSecs;
+      document.getElementById('pomo-display').textContent = `${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
+      if (remaining <= 0) { clearInterval(pomoInterval); pomoRunning = false; pomoComplete(); }
+    }, 1000);
+  }
+}
+
+function pomoComplete() {
+  pushNotif(`Pomodoro concluído! ${pomoMode === 'foco' ? 'Hora de descansar.' : 'Volte ao foco!'}`);
+  if (pomoMode === 'foco') {
+    const focoMins = parseInt(document.getElementById('pomo-cfg-foco').value) || 25;
+    pomoMinsToday += focoMins;
+    pomoCiclos++;
+    const cid = document.getElementById('pomo-concurso').value;
+    const mid = document.getElementById('pomo-materia').value;
+    if (cid && mid) {
+      const sess = buildSession(cid, mid, focoMins, today(), 'Pomodoro');
+      if (sess) pushSession(sess);
+    }
+    pomoMode = (pomoCiclos % 4 === 0) ? 'longa' : 'pausa';
+  } else {
+    pomoMode = 'foco';
+  }
+  pomoSecs = 0;
+  document.getElementById('pomo-btn').textContent = 'Iniciar';
+  renderPomoDisplay();
+}
+
+function resetPomo() {
+  clearInterval(pomoInterval); pomoRunning = false; pomoSecs = 0; pomoMode = 'foco';
+  document.getElementById('pomo-btn').textContent = 'Iniciar';
+  renderPomoDisplay();
+}
+
+function skipPomo() { pomoSecs = pomoDuration(); }
+
+// ─── DASHBOARD ──────────────────────────────────────────────────────────────
+let chartPizza = null, chartDias = null;
+
+function renderDashboard() {
+  const ws = weekStart();
+  const weekSessoes = st.sessoes.filter(s => s.data >= ws);
+  const tot = totalMins(st.sessoes), wk = totalMins(weekSessoes);
+  const avg = st.sessoes.length ? Math.round(tot / st.sessoes.length) : 0;
+  const totalMaterias = st.concursos.reduce((a, c) => a + c.materias.length, 0);
+
+  document.getElementById('m-total').textContent = fmtHM(tot);
+  document.getElementById('m-total-sub').textContent = `${st.sessoes.length} sessões no total`;
+  document.getElementById('m-week').textContent = fmtHM(wk);
+  document.getElementById('m-week-sub').textContent = `${weekSessoes.length} sessões esta semana`;
+  document.getElementById('m-sessoes').textContent = st.sessoes.length;
+  document.getElementById('m-avg').textContent = `Média ${fmtHM(avg)}/sessão`;
+  document.getElementById('m-concursos').textContent = st.concursos.length;
+  document.getElementById('m-materias-count').textContent = `${totalMaterias} matérias`;
+
+  // Pizza chart
+  const byMat = {};
+  st.sessoes.forEach(s => { byMat[s.materia] = (byMat[s.materia] || 0) + s.duracao; });
+  const entries = Object.entries(byMat).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const hexColors = ['#2d6a4f','#1e4b8f','#5b3b8c','#92600a','#0d6e6e','#b5451b','#888888','#637AB0'];
+
+  if (chartPizza) chartPizza.destroy();
+  const ctx1 = document.getElementById('chart-pizza').getContext('2d');
+  if (entries.length) {
+    chartPizza = new Chart(ctx1, {
+      type: 'doughnut',
+      data: {
+        labels: entries.map(e => e[0]),
+        datasets: [{ data: entries.map(e => Math.round(e[1])), backgroundColor: hexColors, borderWidth: 2, borderColor: '#ffffff' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '60%',
+        plugins: { legend: { position: 'right', labels: { font: { size: 11, family: 'DM Sans' }, boxWidth: 10, padding: 10 } } }
+      }
+    });
+  } else {
+    ctx1.clearRect(0,0,1000,1000);
+    ctx1.fillStyle = '#aaa'; ctx1.font = '14px DM Sans'; ctx1.textAlign = 'center';
+    ctx1.fillText('Sem dados ainda', 150, 110);
+  }
+
+  // Progress por concurso
+  const dap = document.getElementById('dash-progress');
+  if (!st.concursos.length) { dap.innerHTML = '<div class="empty-state"><p>Nenhum concurso.</p></div>'; }
+  else {
+    dap.innerHTML = st.concursos.map(c => {
+      const col = COR_MAP[c.cor] || COR_MAP.accent;
+      const minsC = totalMins(sessoesByConc(c.id));
+      const metaH = c.materias.reduce((a, m) => a + m.metaHoras, 0);
+      const p = pct(minsC / 60, metaH);
+      const dias = daysUntil(c.dataProva);
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+          <span style="font-weight:500">${c.nome} ${dias !== null ? `<span style="font-size:11px;color:var(--text-3)">(${dias}d)</span>` : ''}</span>
+          <span style="color:var(--text-3)">${p}%</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:${p}%;background:${col.hex}"></div></div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">${fmtHM(minsC)} de ${metaH}h</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Bar chart — últimos 14 dias
+  const last14 = Array.from({length:14}, (_,i) => {
+    const d = new Date(); d.setDate(d.getDate() - 13 + i);
+    return d.toISOString().split('T')[0];
+  });
+  const byDay = {};
+  st.sessoes.forEach(s => { if (last14.includes(s.data)) byDay[s.data] = (byDay[s.data]||0) + s.duracao; });
+  if (chartDias) chartDias.destroy();
+  chartDias = new Chart(document.getElementById('chart-dias').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: last14.map(d => { const dt = new Date(d+'T12:00:00'); return dt.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric'}); }),
+      datasets: [{ data: last14.map(d => byDay[d]||0), backgroundColor: last14.map(d => d === today() ? '#2d6a4f' : '#1e4b8f33'), borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => fmtHM(v), font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.04)' }, beginAtZero: true },
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } }
+      }
+    }
+  });
+
+  // Sessões recentes
+  const dr = document.getElementById('dash-recentes');
+  const recentes = [...st.sessoes].reverse().slice(0, 5);
+  if (!recentes.length) { dr.innerHTML = '<div class="empty-state"><p>Nenhuma sessão ainda.</p></div>'; }
+  else {
+    dr.innerHTML = recentes.map(s => {
+      const c = st.concursos.find(x => x.id === s.concursoId);
+      const col = c ? COR_MAP[c.cor] || COR_MAP.accent : COR_MAP.accent;
+      return `<div class="list-item">
+        <div style="width:3px;height:32px;border-radius:2px;background:${col.hex};flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${s.materia}</div>
+          <div style="font-size:11px;color:var(--text-3)">${s.concurso} · ${s.data}</div>
+        </div>
+        <span style="font-size:13px;color:var(--text-2)">${fmtHM(s.duracao)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Meta semanal
+  const dm = document.getElementById('dash-metas-semana');
+  if (!st.concursos.length) { dm.innerHTML = '<div class="empty-state"><p>Nenhum concurso com metas.</p></div>'; }
+  else {
+    dm.innerHTML = st.concursos.filter(c => c.metaSemanal).map(c => {
+      const col = COR_MAP[c.cor] || COR_MAP.accent;
+      const wkMins = totalMins(weekSessoes.filter(s => s.concursoId === c.id));
+      const p = pct(wkMins / 60, c.metaSemanal);
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>${c.nome}</span>
+          <span style="color:${p >= 100 ? 'var(--accent)' : 'var(--text-3)'};font-weight:${p>=100?'600':'400'}">${p >= 100 ? '✓ Meta atingida' : `${fmtHM(wkMins)} / ${c.metaSemanal}h`}</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:${p}%;background:${col.hex}"></div></div>
+      </div>`;
+    }).join('') || '<p style="font-size:13px;color:var(--text-3)">Nenhum concurso com meta semanal definida.</p>';
+  }
+}
+
+// ─── HISTÓRICO ──────────────────────────────────────────────────────────────
+function renderHistorico() {
+  populateAllSelects();
+  const fc = document.getElementById('h-filtro-c').value;
+  const fm = document.getElementById('h-filtro-m').value;
+  const fp = document.getElementById('h-filtro-periodo').value;
+
+  let sessoes = [...st.sessoes].reverse();
+  if (fc) sessoes = sessoes.filter(s => s.concursoId === parseInt(fc));
+  if (fm) sessoes = sessoes.filter(s => s.materia === fm);
+  if (fp !== 'todos') {
+    const cutoff = (() => {
+      const d = new Date();
+      if (fp === '7') d.setDate(d.getDate()-7);
+      else if (fp === '30') d.setDate(d.getDate()-30);
+      else if (fp === 'mes') d.setDate(1);
+      return d.toISOString().split('T')[0];
+    })();
+    sessoes = sessoes.filter(s => s.data >= cutoff);
+  }
+
+  const el = document.getElementById('historico-list');
+  if (!sessoes.length) { el.innerHTML = '<div class="empty-state"><p>Nenhuma sessão encontrada.</p></div>'; }
+  else {
+    el.innerHTML = sessoes.map(s => {
+      const c = st.concursos.find(x => x.id === s.concursoId);
+      const col = c ? COR_MAP[c.cor] || COR_MAP.accent : COR_MAP.accent;
+      return `<div class="list-item">
+        <div style="width:3px;height:36px;border-radius:2px;background:${col.hex};flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${s.materia}</div>
+          <div style="font-size:11px;color:var(--text-3)">${s.concurso}${s.nota ? ' · ' + s.nota : ''}</div>
+        </div>
+        <span style="font-size:12px;color:var(--text-3);margin-right:8px">${s.data}</span>
+        <span style="font-size:13px;color:var(--text-2);margin-right:12px">${fmtHM(s.duracao)}</span>
+        <button class="btn-icon" onclick="deleteSessao(${s.id})">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+  }
+
+  // Acumulado por matéria
+  const byMat = {};
+  st.sessoes.forEach(s => {
+    const k = `${s.concurso} — ${s.materia}`;
+    byMat[k] = (byMat[k]||0) + s.duracao;
+  });
+  const entries = Object.entries(byMat).sort((a,b) => b[1]-a[1]);
+  const max = entries[0]?.[1] || 1;
+  const colors = ['#2d6a4f','#1e4b8f','#5b3b8c','#92600a','#0d6e6e','#b5451b'];
+  const hm = document.getElementById('hist-materias');
+  if (!entries.length) { hm.innerHTML = '<div class="empty-state"><p>Sem dados.</p></div>'; }
+  else {
+    hm.innerHTML = entries.map(([k,v],i) => `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>${k}</span>
+          <span style="color:var(--text-3)">${fmtHM(v)}</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:${Math.round(v/max*100)}%;background:${colors[i%colors.length]}"></div></div>
+      </div>`).join('');
+  }
+}
+
+// ─── METAS ──────────────────────────────────────────────────────────────────
+function renderMetas() {
+  const ws = weekStart();
+  const weekSessoes = st.sessoes.filter(s => s.data >= ws);
+
+  // Semana
+  const msl = document.getElementById('metas-semana-list');
+  msl.innerHTML = st.concursos.filter(c => c.metaSemanal).map(c => {
+    const col = COR_MAP[c.cor] || COR_MAP.accent;
+    const wkMins = totalMins(weekSessoes.filter(s => s.concursoId === c.id));
+    const p = pct(wkMins / 60, c.metaSemanal);
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-weight:500;font-size:14px">${c.nome}</span>
+        <span class="badge ${p >= 100 ? 'badge-green' : p >= 60 ? 'badge-blue' : 'badge-amber'}">${p}%</span>
+      </div>
+      <div class="progress-wrap" style="height:8px"><div class="progress-fill" style="width:${p}%;background:${col.hex}"></div></div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:3px">${fmtHM(wkMins)} de ${c.metaSemanal}h esta semana</div>
+    </div>`;
+  }).join('') || '<p style="font-size:13px;color:var(--text-3)">Nenhum concurso com meta semanal.</p>';
+
+  // Por matéria
+  const mml = document.getElementById('metas-materia-list');
+  const rows = st.concursos.flatMap(c => c.materias.filter(m => m.metaHoras).map(m => {
+    const col = COR_MAP[c.cor] || COR_MAP.accent;
+    const mins = totalMins(sessoesByMat(c.id, m.id));
+    const p = pct(mins / 60, m.metaHoras);
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span><span style="color:${col.hex}">●</span> ${m.nome} <span style="font-size:11px;color:var(--text-3)">(${c.nome})</span></span>
+        <span style="color:var(--text-3)">${fmtHM(mins)} / ${m.metaHoras}h</span>
+      </div>
+      <div class="progress-wrap"><div class="progress-fill" style="width:${p}%;background:${col.hex}"></div></div>
+    </div>`;
+  }));
+  mml.innerHTML = rows.join('') || '<p style="font-size:13px;color:var(--text-3)">Nenhuma matéria com meta definida.</p>';
+
+  // Projeções
+  const mp = document.getElementById('metas-projecoes');
+  if (!st.concursos.length) { mp.innerHTML = '<div class="empty-state"><p>Nenhum concurso.</p></div>'; return; }
+
+  const avgDayMins = (() => {
+    if (!st.sessoes.length) return 0;
+    const days = [...new Set(st.sessoes.map(s => s.data))].length;
+    return totalMins(st.sessoes) / days;
+  })();
+
+  mp.innerHTML = `
+    <div style="margin-bottom:20px">
+      <div class="metric-card" style="margin-bottom:12px">
+        <div class="metric-label">Média diária</div>
+        <div class="metric-value" style="font-size:22px">${fmtHM(avgDayMins)}</div>
+      </div>
+    </div>
+    ${st.concursos.map(c => {
+      const dias = daysUntil(c.dataProva);
+      if (dias === null) return '';
+      const totalMetaH = c.materias.reduce((a,m) => a+m.metaHoras, 0);
+      const feito = totalMins(sessoesByConc(c.id)) / 60;
+      const falta = Math.max(0, totalMetaH - feito);
+      const diasNecessarios = avgDayMins > 0 ? Math.ceil(falta / (avgDayMins / 60)) : '∞';
+      const col = COR_MAP[c.cor] || COR_MAP.accent;
+      return `<div class="card" style="margin-bottom:12px;border-left:3px solid ${col.hex}">
+        <div style="font-weight:500;margin-bottom:8px">${c.nome}</div>
+        <div style="display:flex;gap:16px;font-size:13px">
+          <div><div style="color:var(--text-3);font-size:11px">Dias restantes</div><div style="font-weight:600">${dias}</div></div>
+          <div><div style="color:var(--text-3);font-size:11px">Horas faltando</div><div style="font-weight:600">${falta.toFixed(1)}h</div></div>
+          <div><div style="color:var(--text-3);font-size:11px">Dias p/ zerar</div><div style="font-weight:600;color:${typeof diasNecessarios === 'number' && diasNecessarios > dias ? 'var(--red)' : 'var(--accent)'}">${diasNecessarios}</div></div>
+          <div><div style="color:var(--text-3);font-size:11px">h/dia necessário</div><div style="font-weight:600">${dias > 0 ? (falta/dias).toFixed(1) + 'h' : '—'}</div></div>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+// ─── EXPORT ─────────────────────────────────────────────────────────────────
+function getSessoesFiltradas() {
+  const periodo = document.getElementById('exp-periodo').value;
+  const cid = document.getElementById('exp-concurso').value;
+  let sessoes = [...st.sessoes];
+  if (cid) sessoes = sessoes.filter(s => s.concursoId === parseInt(cid));
+  if (periodo !== 'todos') {
+    const d = new Date();
+    if (periodo === '7') d.setDate(d.getDate()-7);
+    else if (periodo === '30') d.setDate(d.getDate()-30);
+    else if (periodo === 'mes') d.setDate(1);
+    const cutoff = d.toISOString().split('T')[0];
+    sessoes = sessoes.filter(s => s.data >= cutoff);
+  }
+  return sessoes;
+}
+
+function renderExport() {
+  populateAllSelects();
+  const sessoes = getSessoesFiltradas();
+  const tot = totalMins(sessoes);
+  const ep = document.getElementById('export-preview');
+  ep.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:24px;font-weight:600;font-family:'DM Serif Display',serif">${sessoes.length} sessões</div>
+      <div style="font-size:13px;color:var(--text-3)">${fmtHM(tot)} no total</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-2)">
+      ${sessoes.slice(0,5).map(s => `<div class="list-item" style="padding:8px 0"><span style="flex:1">${s.materia}</span><span style="color:var(--text-3)">${s.data}</span><span style="min-width:70px;text-align:right">${fmtHM(s.duracao)}</span></div>`).join('')}
+      ${sessoes.length > 5 ? `<div style="text-align:center;padding:8px;color:var(--text-3);font-size:12px">+ ${sessoes.length-5} sessões...</div>` : ''}
+    </div>`;
+}
+
+function exportCSV() {
+  const sessoes = getSessoesFiltradas();
+  const header = 'Concurso,Matéria,Data,Duração (min),Anotações\n';
+  const rows = sessoes.map(s => `"${s.concurso}","${s.materia}","${s.data}",${s.duracao},"${s.nota||''}"`).join('\n');
+  download('studyflow_export.csv', header + rows, 'text/csv');
+  notify('CSV exportado com sucesso!');
+}
+
+function exportJSON() {
+  download('studyflow_backup.json', JSON.stringify(st, null, 2), 'application/json');
+  notify('JSON exportado com sucesso!');
+}
+
+function exportRelatorio() {
+  const sessoes = getSessoesFiltradas();
+  const tot = totalMins(sessoes);
+  const byMat = {};
+  sessoes.forEach(s => { byMat[s.materia] = (byMat[s.materia]||0) + s.duracao; });
+  const matRows = Object.entries(byMat).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `<tr><td>${k}</td><td>${fmtHM(v)}</td><td>${Math.round(v/tot*100)}%</td></tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório StudyFlow</title>
+  <style>body{font-family:sans-serif;padding:40px;color:#1a1916}h1{font-size:28px;margin-bottom:4px}p{color:#777}table{width:100%;border-collapse:collapse;margin-top:20px}th{text-align:left;padding:8px;border-bottom:2px solid #eee;font-size:13px;color:#999}td{padding:8px;border-bottom:1px solid #eee;font-size:14px}</style></head>
+  <body><h1>Relatório de Estudos</h1><p>Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
+  <p>Total: <strong>${fmtHM(tot)}</strong> em <strong>${sessoes.length}</strong> sessões</p>
+  <table><thead><tr><th>Matéria</th><th>Tempo</th><th>%</th></tr></thead><tbody>${matRows}</tbody></table>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  w.document.write(html); w.document.close(); w.print();
+}
+
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.concursos && data.sessoes) {
+        if (confirm(`Importar ${data.concursos.length} concursos e ${data.sessoes.length} sessões? Dados atuais serão substituídos.`)) {
+          st = data; save(); location.reload();
+        }
+      } else { notify('Arquivo inválido.', 'warning'); }
+    } catch(e) { notify('Erro ao ler arquivo.', 'warning'); }
+  };
+  reader.readAsText(file);
+}
+
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name; a.click();
+}
+
+// ─── FRASES MOTIVACIONAIS ────────────────────────────────────────────────────
+const FRASES = [
+  { texto: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", autor: "Robert Collier" },
+  { texto: "Educação não é a resposta para a pergunta. Educação é o meio de encontrar a resposta para todas as perguntas.", autor: "William Allin" },
+  { texto: "Ninguém é tão ignorante que não tenha algo a ensinar, e ninguém é tão sábio que não tenha algo a aprender.", autor: "Blaise Pascal" },
+  { texto: "O único lugar onde o sucesso vem antes do trabalho é no dicionário.", autor: "Albert Einstein" },
+  { texto: "A persistência é o caminho do êxito.", autor: "Charles Chaplin" },
+  { texto: "Não importa o quão devagar você vá, desde que você não pare.", autor: "Confúcio" },
+  { texto: "Viva como se fosse morrer amanhã. Aprenda como se fosse viver para sempre.", autor: "Mahatma Gandhi" },
+  { texto: "O conhecimento é a única coisa que ninguém pode tirar de você.", autor: "B.B. King" },
+  { texto: "Antes de ser um líder, o sucesso tem tudo a ver com crescer a si mesmo. Quando você se torna um líder, o sucesso tem tudo a ver com crescer os outros.", autor: "Jack Welch" },
+  { texto: "Quanto mais eu leio, mais eu adquiro, mais estou certo de que não sei nada.", autor: "Voltaire" },
+  { texto: "A disciplina é a ponte entre metas e realizações.", autor: "Jim Rohn" },
+  { texto: "Todo grande realizador é um grande sonhador. Sonhe alto, pois alto são as esperanças, pensamentos e ideais que permanecem.", autor: "Benjamin Harrison" },
+  { texto: "Não é sobre ter tempo, é sobre fazer tempo.", autor: "Mel Robbins" },
+  { texto: "A educação é a arma mais poderosa que você pode usar para mudar o mundo.", autor: "Nelson Mandela" },
+  { texto: "O talento vence jogos, mas o trabalho em equipe e a inteligência vencem campeonatos.", autor: "Michael Jordan" },
+  { texto: "Investir em conhecimento sempre paga os melhores juros.", autor: "Benjamin Franklin" },
+  { texto: "O futuro pertence àqueles que acreditam na beleza de seus sonhos.", autor: "Eleanor Roosevelt" },
+  { texto: "Não basta saber, é preciso aplicar. Não basta querer, é preciso fazer.", autor: "Johann Wolfgang von Goethe" },
+  { texto: "A única maneira de fazer um trabalho excelente é amar o que você faz.", autor: "Steve Jobs" },
+  { texto: "Cada conquista começa com a decisão de tentar.", autor: "John F. Kennedy" },
+  { texto: "Aprenda como se você fosse viver para sempre, viva como se fosse morrer hoje.", autor: "James Dean" },
+  { texto: "O sucesso geralmente vem para aqueles que estão ocupados demais para procurá-lo.", autor: "Henry David Thoreau" },
+  { texto: "Acredite que você pode, e você já está na metade do caminho.", autor: "Theodore Roosevelt" },
+  { texto: "A excelência não é uma habilidade, é uma atitude.", autor: "Ralph Marston" },
+  { texto: "Nunca é tarde demais para ser o que você poderia ter sido.", autor: "George Eliot" },
+];
+
+function mostrarFrase() {
+  const hoje = new Date().toDateString();
+  const ultimaVez = localStorage.getItem('studyflow_frase_dia');
+
+  // Sorteia uma frase (ou reutiliza a do dia se já sorteou)
+  let idx = localStorage.getItem('studyflow_frase_idx');
+  if (ultimaVez !== hoje || idx === null) {
+    idx = Math.floor(Math.random() * FRASES.length);
+    localStorage.setItem('studyflow_frase_idx', idx);
+  }
+  const f = FRASES[parseInt(idx)];
+  document.getElementById('frase-texto').textContent = `"${f.texto}"`;
+  document.getElementById('frase-autor').textContent = `— ${f.autor}`;
+
+  if (ultimaVez !== hoje) {
+    setTimeout(() => {
+      document.getElementById('modal-frase').classList.add('show');
+      localStorage.setItem('studyflow_frase_dia', hoje);
+    }, 800);
+  }
+}
+
+function verFraseDia() {
+  mostrarFrase();
+  document.getElementById('modal-frase').classList.add('show');
+}
+
+// ─── SIDEBAR MOBILE ─────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+function mobileGoTab(id, el) {
+  goTab(id);
+  document.querySelectorAll('.mobile-nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  closeSidebar();
+}
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 900) closeSidebar();
+});
+
+// ─── THEMES ─────────────────────────────────────────────────────────────────
+const THEMES = {
+  forest: {
+    '--accent':'#2d6a4f','--accent-light':'#e8f5ef',
+    '--accent-grad':'linear-gradient(135deg,#2d6a4f 0%,#52b788 100%)',
+    '--bg':'#f5f3ee','--surface':'#faf9f6','--card':'#ffffff',
+    '--border':'rgba(0,0,0,0.08)','--border-strong':'rgba(0,0,0,0.15)',
+    '--text':'#1a1916','--text-2':'#6b6860','--text-3':'#9e9b95',
+    '--sidebar':'linear-gradient(180deg,#1a2e1f 0%,#0f1a12 100%)',
+    '--sidebar-name':'Floresta', dark: false
+  },
+  ocean: {
+    '--accent':'#1e6fc4','--accent-light':'#dbeafe',
+    '--accent-grad':'linear-gradient(135deg,#1e4b8f 0%,#4895ef 100%)',
+    '--bg':'#eef4fc','--surface':'#f5f9ff','--card':'#ffffff',
+    '--border':'rgba(0,0,0,0.07)','--border-strong':'rgba(0,0,0,0.13)',
+    '--text':'#0d1f3c','--text-2':'#3b5a8a','--text-3':'#7b9ac0',
+    '--sidebar':'linear-gradient(180deg,#0d2a52 0%,#07172e 100%)',
+    '--sidebar-name':'Oceano', dark: false
+  },
+  dusk: {
+    '--accent':'#7c3aed','--accent-light':'#ede9fe',
+    '--accent-grad':'linear-gradient(135deg,#5b3b8c 0%,#9d4edd 100%)',
+    '--bg':'#f1eefb','--surface':'#f8f6fe','--card':'#ffffff',
+    '--border':'rgba(0,0,0,0.07)','--border-strong':'rgba(0,0,0,0.13)',
+    '--text':'#1e1038','--text-2':'#5a3f82','--text-3':'#9575cd',
+    '--sidebar':'linear-gradient(180deg,#2e1f4a 0%,#180f2e 100%)',
+    '--sidebar-name':'Crepúsculo', dark: false
+  },
+  ember: {
+    '--accent':'#c05522','--accent-light':'#fde8dc',
+    '--accent-grad':'linear-gradient(135deg,#b5451b 0%,#f4845f 100%)',
+    '--bg':'#fdf2ed','--surface':'#fef8f5','--card':'#ffffff',
+    '--border':'rgba(0,0,0,0.07)','--border-strong':'rgba(0,0,0,0.13)',
+    '--text':'#2d1007','--text-2':'#7a3018','--text-3':'#b87060',
+    '--sidebar':'linear-gradient(180deg,#4a1c08 0%,#260d03 100%)',
+    '--sidebar-name':'Brasa', dark: false
+  },
+  slate: {
+    '--accent':'#4b6280','--accent-light':'#e8edf3',
+    '--accent-grad':'linear-gradient(135deg,#374151 0%,#6b7280 100%)',
+    '--bg':'#eef0f4','--surface':'#f5f6f8','--card':'#ffffff',
+    '--border':'rgba(0,0,0,0.07)','--border-strong':'rgba(0,0,0,0.13)',
+    '--text':'#1a202c','--text-2':'#4a5568','--text-3':'#718096',
+    '--sidebar':'linear-gradient(180deg,#1a202c 0%,#0d1117 100%)',
+    '--sidebar-name':'Ardósia', dark: false
+  },
+  dark: {
+    '--accent':'#52b788','--accent-light':'rgba(82,183,136,0.14)',
+    '--accent-grad':'linear-gradient(135deg,#2d6a4f 0%,#52b788 100%)',
+    '--bg':'#0f1117','--surface':'#161b27','--card':'#1e2433',
+    '--border':'rgba(255,255,255,0.07)','--border-strong':'rgba(255,255,255,0.13)',
+    '--text':'#e8eaf0','--text-2':'#9aa0b4','--text-3':'#5c6480',
+    '--sidebar':'linear-gradient(180deg,#0a0c12 0%,#060810 100%)',
+    '--sidebar-name':'Dark', dark: true
+  }
+};
+
+function setTheme(name) {
+  const theme = THEMES[name];
+  if (!theme) return;
+  const root = document.documentElement;
+
+  // Apply all CSS vars except sidebar metadata
+  Object.entries(theme).forEach(([k, v]) => {
+    if (k.startsWith('--')) root.style.setProperty(k, v);
+  });
+
+  // Sidebar gradient
+  document.querySelector('.sidebar').style.background = theme['--sidebar'];
+
+  // Dark body class
+  document.body.classList.toggle('theme-dark', !!theme.dark);
+
+  // Mark active swatch
+  document.querySelectorAll('.theme-swatch').forEach(s =>
+    s.classList.toggle('active', s.dataset.theme === name)
+  );
+
+  try { localStorage.setItem('studyflow_theme', name); } catch(e) {}
+  notify(`Tema "${theme['--sidebar-name']}" ativado!`, 'info');
+}
+
+function loadTheme() {
+  try {
+    const saved = localStorage.getItem('studyflow_theme') || 'forest';
+    setTheme(saved);
+  } catch(e) {}
+}
+
+// ─── AI CHAT ────────────────────────────────────────────────────────────────
+let aiHistory = [];
+
+function buildStudyContext() {
+  const lines = [];
+  if (st.concursos.length) {
+    lines.push(`O aluno tem ${st.concursos.length} concurso(s) cadastrado(s):`);
+    st.concursos.forEach(c => {
+      const minsC = totalMins(sessoesByConc(c.id));
+      const dias = daysUntil(c.dataProva);
+      lines.push(`- ${c.nome}${dias !== null ? ` (prova em ${dias} dias)` : ''}: ${fmtHM(minsC)} estudados`);
+      c.materias.forEach(m => {
+        const mins = totalMins(sessoesByMat(c.id, m.id));
+        const p = m.metaHoras ? Math.round(mins/60/m.metaHoras*100) : null;
+        lines.push(`  • ${m.nome}: ${fmtHM(mins)}${m.metaHoras ? ` / meta ${m.metaHoras}h (${p}%)` : ''} — prioridade ${m.prioridade}`);
+      });
+    });
+  }
+  const tot = totalMins(st.sessoes);
+  lines.push(`\nTotal geral estudado: ${fmtHM(tot)} em ${st.sessoes.length} sessão(ões).`);
+  const ws = weekStart();
+  const wk = totalMins(st.sessoes.filter(s => s.data >= ws));
+  lines.push(`Esta semana: ${fmtHM(wk)}.`);
+  return lines.join('\n');
+}
+
+function aiSuggest(el) {
+  document.getElementById('ai-input').value = el.textContent;
+  document.getElementById('ai-suggestions').style.display = 'none';
+  sendAiMessage();
+}
+
+function appendMsg(role, html) {
+  const wrap = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role === 'user' ? 'user' : ''}`;
+  const isBot = role !== 'user';
+  div.innerHTML = `
+    <div class="ai-avatar ${isBot ? 'bot' : 'user-av'}">${isBot ? 'IA' : 'EU'}</div>
+    <div class="ai-bubble ${isBot ? 'bot' : 'user'}">${html}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  const wrap = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg'; div.id = 'ai-typing-indicator';
+  div.innerHTML = `<div class="ai-avatar bot">IA</div><div class="ai-bubble bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('ai-typing-indicator');
+  if (el) el.remove();
+}
+
+function markdownToHtml(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<strong>$1</strong>')
+    .replace(/^## (.+)$/gm, '<strong style="font-size:15px">$1</strong>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<)(.+)$/gm, '<p>$1</p>')
+    .replace(/<p><\/p>/g, '')
+    .replace(/<p>(<ul>)/g, '$1')
+    .replace(/(<\/ul>)<\/p>/g, '$1');
+}
+
+async function sendAiMessage() {
+  const inp = document.getElementById('ai-input');
+  const msg = inp.value.trim();
+  if (!msg) return;
+
+  inp.value = ''; inp.style.height = 'auto';
+  document.getElementById('ai-suggestions').style.display = 'none';
+  document.getElementById('ai-send-btn').disabled = true;
+
+  appendMsg('user', `<p>${msg.replace(/\n/g,'<br>')}</p>`);
+  aiHistory.push({ role: 'user', content: msg });
+
+  showTyping();
+
+  const systemPrompt = `Você é o Tutor IA do StudyFlow, um assistente especializado em ajudar estudantes de concursos públicos brasileiros. Você é amigável, direto e motivador.
+
+Contexto atual do estudante:
+${buildStudyContext()}
+
+Instruções:
+- Responda sempre em português brasileiro
+- Seja objetivo e prático
+- Use exemplos concretos quando possível
+- Quando analisar o progresso, use os dados fornecidos
+- Formate bem as respostas com listas quando útil
+- Limite respostas a no máximo 300 palavras, exceto quando uma explicação longa for essencial
+- Não use markdown excessivo, prefira texto limpo com negrito pontual`;
+
+  try {
+    const res = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: aiHistory.slice(-10)
+      })
+    });
+
+    const data = await res.json();
+    removeTyping();
+
+    if (data.content && data.content[0]) {
+      const reply = data.content[0].text;
+      aiHistory.push({ role: 'assistant', content: reply });
+      appendMsg('bot', markdownToHtml(reply));
+    } else {
+      appendMsg('bot', '<p>Desculpe, ocorreu um erro. Tente novamente.</p>');
+    }
+  } catch(e) {
+    removeTyping();
+    appendMsg('bot', '<p>Não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente.</p>');
+  }
+
+  document.getElementById('ai-send-btn').disabled = false;
+  document.getElementById('ai-messages').scrollTop = 99999;
+}
+
+
+function requestNotifPermission() {
+  if (!('Notification' in window)) return notify('Seu navegador não suporta notificações.', 'warning');
+  Notification.requestPermission().then(p => {
+    if (p === 'granted') notify('Notificações ativadas!');
+    else notify('Permissão negada.', 'warning');
+  });
+}
+
+// ─── SIMULADOS ───────────────────────────────────────────────────────────────
+let simState = {
+  questoes: [], atual: 0, acertos: 0, erros: 0,
+  respostas: [], inicio: null, materia: '', banca: '', nivel: 'médio'
+};
+let simBancaSel = '';
+let simNivelSel = 'médio';
+let simHistorico = [];
+
+try { simHistorico = JSON.parse(localStorage.getItem('studyflow_simulados') || '[]'); } catch(e) {}
+
+function selecionarBanca(el) {
+  document.querySelectorAll('.banca-card').forEach(b => b.classList.remove('ativa'));
+  el.classList.add('ativa');
+  simBancaSel = el.dataset.banca;
+}
+
+function selecionarNivel(el) {
+  document.querySelectorAll('.nivel-btn').forEach(b => b.classList.remove('ativo'));
+  el.classList.add('ativo');
+  simNivelSel = el.dataset.nivel;
+}
+
+function simTela(nome) {
+  ['config','loading','questao','resultado'].forEach(t => {
+    document.getElementById('sim-tela-'+t).style.display = t === nome ? '' : 'none';
+  });
+}
+
+async function gerarSimulado() {
+  const materia = document.getElementById('sim-materia').value.trim();
+  if (!materia) { notify('Informe uma matéria para gerar o simulado!', 'warn'); return; }
+  const qtd = parseInt(document.getElementById('sim-qtd').value);
+  const concRef = document.getElementById('sim-concurso-ref').value;
+
+  simTela('loading');
+  const msgs = [
+    'Criando enunciados autorais...',
+    'Elaborando alternativas e distratores...',
+    'Ajustando ao estilo da banca...',
+    'Finalizando gabaritos comentados...'
+  ];
+  let mi = 0;
+  const interval = setInterval(() => {
+    document.getElementById('sim-loading-txt').textContent = msgs[mi % msgs.length];
+    mi++;
+  }, 2200);
+
+  const bancaInfo = simBancaSel ? `no estilo da banca ${simBancaSel}` : 'no estilo geral de concursos públicos brasileiros';
+  const concInfo = concRef ? ` para o concurso de ${concRef}` : '';
+
+  const prompt = `Você é um elaborador especialista em questões de concursos públicos brasileiros.
+
+Gere EXATAMENTE ${qtd} questões de ${materia} ${bancaInfo}${concInfo}, nível ${simNivelSel}.
+
+REGRAS OBRIGATÓRIAS:
+- Cada questão deve ter exatamente 5 alternativas (A, B, C, D, E)
+- Apenas UMA alternativa correta por questão
+- As alternativas incorretas devem ser plausíveis e bem elaboradas (distratores de qualidade)
+- O gabarito comentado deve explicar POR QUE a resposta está correta E por que as outras estão erradas (de forma resumida)
+- Varie os temas dentro da disciplina
+- Enunciados claros e objetivos
+
+Responda APENAS com JSON válido, sem texto antes ou depois, neste formato exato:
+{
+  "questoes": [
+    {
+      "enunciado": "texto completo da questão",
+      "alternativas": ["A) texto", "B) texto", "C) texto", "D) texto", "E) texto"],
+      "gabarito": "A",
+      "comentario": "explicação completa do gabarito",
+      "subtema": "tópico específico dentro da matéria"
+    }
+  ]
+}`;
+
+  try {
+    const res = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    clearInterval(interval);
+    const data = await res.json();
+    const raw = data.content.map(c => c.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    if (!parsed.questoes || !parsed.questoes.length) throw new Error('Sem questões');
+
+    simState = {
+      questoes: parsed.questoes, atual: 0, acertos: 0, erros: 0,
+      respostas: [], inicio: Date.now(),
+      materia, banca: simBancaSel, nivel: simNivelSel
+    };
+
+    renderQuestao();
+    simTela('questao');
+  } catch(err) {
+    clearInterval(interval);
+    simTela('config');
+    notify('Erro ao gerar questões. Tente novamente.', 'error');
+    console.error(err);
+  }
+}
+
+function renderQuestao() {
+  const q = simState.questoes[simState.atual];
+  const total = simState.questoes.length;
+  const idx = simState.atual;
+
+  document.getElementById('sim-q-label').textContent = `Questão ${idx+1} de ${total}`;
+  document.getElementById('sim-placar').innerHTML = `✅ ${simState.acertos} &nbsp; ❌ ${simState.erros}`;
+  document.getElementById('sim-prog-fill').style.width = `${(idx/total)*100}%`;
+  document.getElementById('sim-q-banca').textContent = simState.banca || 'Geral';
+  document.getElementById('sim-q-nivel').textContent = simState.nivel;
+  document.getElementById('sim-q-materia').textContent = q.subtema || simState.materia;
+  document.getElementById('sim-q-enunciado').textContent = q.enunciado;
+
+  const opcDiv = document.getElementById('sim-opcoes');
+  opcDiv.innerHTML = '';
+  q.alternativas.forEach((alt, i) => {
+    const letra = String.fromCharCode(65+i);
+    const div = document.createElement('div');
+    div.className = 'sim-opcao';
+    div.dataset.letra = letra;
+    div.onclick = () => selecionarOpcao(div);
+    div.innerHTML = `<div class="sim-letra">${letra}</div><div style="flex:1">${alt.replace(/^[A-E]\)\s*/,'')}</div>`;
+    opcDiv.appendChild(div);
+  });
+
+  document.getElementById('sim-gabarito').classList.remove('show');
+  document.getElementById('sim-gabarito-txt').textContent = '';
+  document.getElementById('sim-btn-confirmar').style.display = 'none';
+  document.getElementById('sim-btn-proxima').style.display = 'none';
+  simState._selecao = null;
+}
+
+function selecionarOpcao(el) {
+  if (simState._respondida) return;
+  document.querySelectorAll('.sim-opcao').forEach(o => o.classList.remove('selecionada'));
+  el.classList.add('selecionada');
+  simState._selecao = el.dataset.letra;
+  document.getElementById('sim-btn-confirmar').style.display = '';
+}
+
+function confirmarResposta() {
+  if (!simState._selecao) { notify('Selecione uma alternativa!', 'warn'); return; }
+  const q = simState.questoes[simState.atual];
+  const correta = q.gabarito.toUpperCase();
+  const escolha = simState._selecao;
+  simState._respondida = true;
+
+  document.querySelectorAll('.sim-opcao').forEach(o => {
+    if (o.dataset.letra === correta) o.classList.add('correta');
+    if (o.dataset.letra === escolha && escolha !== correta) o.classList.add('errada');
+    o.onclick = null;
+  });
+
+  if (escolha === correta) simState.acertos++;
+  else simState.erros++;
+
+  simState.respostas.push({ escolha, correta, acertou: escolha === correta });
+  document.getElementById('sim-placar').innerHTML = `✅ ${simState.acertos} &nbsp; ❌ ${simState.erros}`;
+
+  const gab = document.getElementById('sim-gabarito');
+  document.getElementById('sim-gabarito-txt').textContent = q.comentario;
+  gab.classList.add('show');
+
+  document.getElementById('sim-btn-confirmar').style.display = 'none';
+  document.getElementById('sim-btn-proxima').style.display = '';
+  document.getElementById('sim-btn-proxima').textContent =
+    simState.atual < simState.questoes.length - 1 ? 'Próxima questão →' : 'Ver resultado 🏆';
+}
+
+function proximaQuestao() {
+  simState._respondida = false;
+  simState._selecao = null;
+  if (simState.atual < simState.questoes.length - 1) {
+    simState.atual++;
+    renderQuestao();
+  } else {
+    mostrarResultado();
+  }
+}
+
+function encerrarSimulado() {
+  if (!confirm('Encerrar o simulado agora? O progresso será perdido.')) return;
+  simTela('config');
+}
+
+async function mostrarResultado() {
+  const total = simState.questoes.length;
+  const pct = Math.round((simState.acertos / total) * 100);
+  const mins = Math.round((Date.now() - simState.inicio) / 60000);
+
+  document.getElementById('res-acertos').textContent = simState.acertos;
+  document.getElementById('res-erros').textContent = simState.erros;
+  document.getElementById('res-pct').textContent = pct + '%';
+  document.getElementById('res-tempo').textContent = mins + 'min';
+  document.getElementById('res-barra').style.width = pct + '%';
+  document.getElementById('res-barra-label').textContent = `${simState.acertos} de ${total} questões corretas`;
+
+  let emoji, titulo, sub;
+  if (pct >= 80) { emoji='🏆'; titulo='Excelente desempenho!'; sub='Você está bem preparado nessa matéria!'; }
+  else if (pct >= 60) { emoji='👍'; titulo='Bom resultado!'; sub='Continue praticando para chegar à excelência.'; }
+  else if (pct >= 40) { emoji='📚'; titulo='Precisa estudar mais!'; sub='Revise os conteúdos e tente novamente.'; }
+  else { emoji='💪'; titulo='Não desanime!'; sub='Todo concurseiro já esteve aqui. Revise e pratique!'; }
+
+  document.getElementById('sim-emoji-resultado').textContent = emoji;
+  document.getElementById('sim-resultado-titulo').textContent = titulo;
+  document.getElementById('sim-resultado-sub').textContent = sub;
+
+  // Salvar no histórico
+  const reg = {
+    data: new Date().toLocaleDateString('pt-BR'),
+    materia: simState.materia,
+    banca: simState.banca || 'Geral',
+    nivel: simState.nivel,
+    total, acertos: simState.acertos, pct, mins
+  };
+  simHistorico.unshift(reg);
+  if (simHistorico.length > 50) simHistorico.pop();
+  try { localStorage.setItem('studyflow_simulados', JSON.stringify(simHistorico)); } catch(e) {}
+  renderSimHistorico();
+  simTela('resultado');
+
+  // Feedback IA
+  try {
+    const erradas = simState.questoes
+      .filter((q,i) => !simState.respostas[i]?.acertou)
+      .map(q => q.subtema || q.enunciado.substring(0,60))
+      .join(', ');
+
+    const fbPrompt = `O estudante fez um simulado de ${simState.materia} com ${total} questões e acertou ${simState.acertos} (${pct}%).
+${erradas ? `Tópicos em que errou: ${erradas}.` : 'Acertou tudo!'}
+Em 3-4 frases curtas, dê um feedback motivador e 2 dicas práticas de como melhorar. Seja direto e encorajador.`;
+
+    const fbRes = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 400,
+        messages: [{ role: 'user', content: fbPrompt }]
+      })
+    });
+    const fbData = await fbRes.json();
+    const fbTxt = fbData.content.map(c => c.text || '').join('');
+    document.getElementById('sim-feedback-txt').textContent = fbTxt;
+    document.getElementById('sim-feedback-ia').style.display = '';
+  } catch(e) { /* silently fail */ }
+}
+
+function novoSimulado() {
+  simState = { questoes:[], atual:0, acertos:0, erros:0, respostas:[], inicio:null, materia:'', banca:'', nivel:'médio' };
+  simTela('config');
+  renderSimHistorico();
+}
+
+function revisarSimulado() {
+  simState.atual = 0;
+  renderQuestao();
+  // Mostrar gabarito direto
+  simTela('questao');
+  document.getElementById('sim-btn-proxima').style.display = '';
+  document.getElementById('sim-btn-proxima').textContent = 'Próxima →';
+  simState._revisao = true;
+  renderRevisao();
+}
+
+function renderRevisao() {
+  const q = simState.questoes[simState.atual];
+  const correta = q.gabarito.toUpperCase();
+  const resp = simState.respostas[simState.atual];
+
+  document.querySelectorAll('.sim-opcao').forEach(o => {
+    o.onclick = null;
+    if (o.dataset.letra === correta) o.classList.add('correta');
+    if (resp && o.dataset.letra === resp.escolha && !resp.acertou) o.classList.add('errada');
+  });
+  document.getElementById('sim-gabarito-txt').textContent = q.comentario;
+  document.getElementById('sim-gabarito').classList.add('show');
+  document.getElementById('sim-btn-confirmar').style.display = 'none';
+  document.getElementById('sim-btn-proxima').style.display = '';
+  document.getElementById('sim-btn-proxima').textContent =
+    simState.atual < simState.questoes.length - 1 ? 'Próxima →' : 'Finalizar revisão';
+  document.getElementById('sim-btn-proxima').onclick = () => {
+    if (simState.atual < simState.questoes.length - 1) {
+      simState.atual++; renderQuestao(); renderRevisao();
+    } else { novoSimulado(); }
+  };
+}
+
+function renderSimHistorico() {
+  const el = document.getElementById('sim-historico-lista');
+  if (!simHistorico.length) {
+    el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-3);font-size:13px">Nenhum simulado realizado ainda.</div>';
+    return;
+  }
+  el.innerHTML = simHistorico.slice(0, 10).map(s => `
+    <div class="list-item">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500">${s.materia} <span style="font-size:12px;color:var(--text-3);font-weight:400">· ${s.banca} · ${s.nivel}</span></div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px">${s.data} · ${s.total} questões · ${s.mins}min</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:18px;font-weight:600;font-family:'DM Serif Display',serif;color:${s.pct>=60?'var(--accent)':s.pct>=40?'var(--amber)':'var(--red)'}">${s.pct}%</div>
+        <div style="font-size:11px;color:var(--text-3)">${s.acertos}/${s.total} acertos</div>
+      </div>
+    </div>`).join('');
+}
+
+function initSimulados() {
+  // Preencher select de concursos
+  const sel = document.getElementById('sim-concurso-ref');
+  st.concursos.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.nome; o.textContent = c.nome;
+    sel.appendChild(o);
+  });
+  // Marcar banca padrão
+  document.querySelector('.banca-card[data-banca=""]').classList.add('ativa');
+  renderSimHistorico();
+}
+
+// ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
+// ⚠️ SUBSTITUA pelas suas chaves do painel Supabase (Project Settings → API)
+const SUPABASE_URL  = 'https://vxhkppfelyvslmekzqwo.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4aGtwcGZlbHl2c2xtZWt6cXdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MjE1NjAsImV4cCI6MjA4ODk5NzU2MH0.WWQwGCOhobFJp64idQJYPatmgAbcslnM6NmfPfKtdpg';
+
+// Proxy para a API de IA (resolve bloqueio CORS do GitHub Pages)
+const AI_PROXY_URL = `${SUPABASE_URL}/functions/v1/ai-proxy`;
+
+let sb = null;
+let currentUser = null;
+const USE_SUPABASE = SUPABASE_URL !== 'COLE_SUA_URL_AQUI';
+
+if (USE_SUPABASE) {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+// ─── AUTH UI ─────────────────────────────────────────────────────────────────
+function authTab(tab) {
+  document.getElementById('form-login').style.display      = tab === 'login'     ? '' : 'none';
+  document.getElementById('form-cadastro').style.display   = tab === 'cadastro'  ? '' : 'none';
+  document.getElementById('form-recuperar').style.display  = tab === 'recuperar' ? '' : 'none';
+  document.getElementById('tab-login-btn').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-cadastro-btn').classList.toggle('active', tab === 'cadastro');
+  document.getElementById('auth-error').classList.remove('show');
+}
+
+function contaTab(tab) {
+  document.getElementById('conta-form-email').style.display = tab === 'email' ? '' : 'none';
+  document.getElementById('conta-form-senha').style.display = tab === 'senha' ? '' : 'none';
+  document.getElementById('conta-tab-email-btn').classList.toggle('active', tab === 'email');
+  document.getElementById('conta-tab-senha-btn').classList.toggle('active', tab === 'senha');
+  document.getElementById('conta-msg').style.display = 'none';
+}
+
+function contaMsg(msg, tipo) {
+  const el = document.getElementById('conta-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = tipo === 'ok' ? 'var(--accent-light)' : 'var(--red-light)';
+  el.style.color = tipo === 'ok' ? 'var(--accent)' : 'var(--red)';
+}
+
+function authError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.classList.add('show');
+}
+
+function authLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Aguarde...' : (btnId === 'btn-login' ? 'Entrar' : 'Criar conta gratuita');
+}
+
+async function fazerLogin() {
+  if (!USE_SUPABASE) { entrarModoLocal(); return; }
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  if (!email || !senha) { authError('Preencha e-mail e senha.'); return; }
+  authLoading('btn-login', true);
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+  authLoading('btn-login', false);
+  if (error) { authError(traduirErroAuth(error.message)); return; }
+}
+
+async function fazerCadastro() {
+  if (!USE_SUPABASE) { entrarModoLocal(); return; }
+  const nome  = document.getElementById('cad-nome').value.trim();
+  const email = document.getElementById('cad-email').value.trim();
+  const senha = document.getElementById('cad-senha').value;
+  if (!nome || !email || !senha) { authError('Preencha todos os campos.'); return; }
+  if (senha.length < 6) { authError('A senha deve ter pelo menos 6 caracteres.'); return; }
+  authLoading('btn-cadastro', true);
+  const { error } = await sb.auth.signUp({
+    email, password: senha,
+    options: {
+      data: { full_name: nome },
+      emailRedirectTo: 'https://gerenciador-acessos.github.io/studyflow/'
+    }
+  });
+  authLoading('btn-cadastro', false);
+  if (error) { authError(traduirErroAuth(error.message)); return; }
+  document.getElementById('auth-error').style.background = 'var(--accent-light)';
+  document.getElementById('auth-error').style.color = 'var(--accent)';
+  authError('✅ Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+  document.getElementById('auth-error').classList.add('show');
+}
+
+async function loginGoogle() {
+  if (!USE_SUPABASE) { entrarModoLocal(); return; }
+  await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+}
+
+async function fazerLogout() {
+  toggleUserMenu();
+  if (USE_SUPABASE && sb) await sb.auth.signOut();
+  currentUser = null;
+  appInitialized = false; // BUG FIX: permite reinicializar ao logar novamente
+  st = { concursos: [], sessoes: [] };
+  // BUG FIX: destruir gráficos para evitar erro "Canvas already in use"
+  if (typeof chartPizza !== 'undefined' && chartPizza) { chartPizza.destroy(); chartPizza = null; }
+  if (typeof chartDias !== 'undefined' && chartDias) { chartDias.destroy(); chartDias = null; }
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+function traduirErroAuth(msg) {
+  if (msg.includes('Invalid login')) return 'E-mail ou senha incorretos.';
+  if (msg.includes('already registered')) return 'Este e-mail já está cadastrado.';
+  if (msg.includes('Password should')) return 'A senha deve ter pelo menos 6 caracteres.';
+  if (msg.includes('Unable to validate')) return 'E-mail inválido.';
+  if (msg.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  return msg;
+}
+
+async function recuperarSenha() {
+  if (!USE_SUPABASE) return;
+  const email = document.getElementById('rec-email').value.trim();
+  if (!email) { authError('Digite seu e-mail.'); return; }
+  const btn = document.getElementById('btn-recuperar');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://gerenciador-acessos.github.io/studyflow/'
+  });
+  btn.disabled = false; btn.textContent = 'Enviar link de recuperação';
+  if (error) { authError(traduirErroAuth(error.message)); return; }
+  document.getElementById('auth-error').style.background = 'var(--accent-light)';
+  document.getElementById('auth-error').style.color = 'var(--accent)';
+  authError('✅ Link enviado! Verifique seu e-mail.');
+}
+
+async function trocarEmail() {
+  if (!USE_SUPABASE || !currentUser) return;
+  const novo = document.getElementById('conta-novo-email').value.trim();
+  const conf = document.getElementById('conta-conf-email').value.trim();
+  if (!novo) { contaMsg('Digite o novo e-mail.', 'erro'); return; }
+  if (novo !== conf) { contaMsg('Os e-mails não coincidem.', 'erro'); return; }
+  const btn = document.getElementById('btn-trocar-email');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const { error } = await sb.auth.updateUser({ email: novo });
+  btn.disabled = false; btn.textContent = 'Salvar novo e-mail';
+  if (error) { contaMsg(traduirErroAuth(error.message), 'erro'); return; }
+  contaMsg('✅ Confirmação enviada para o novo e-mail!', 'ok');
+  document.getElementById('conta-novo-email').value = '';
+  document.getElementById('conta-conf-email').value = '';
+}
+
+async function trocarSenha() {
+  if (!USE_SUPABASE || !currentUser) return;
+  const nova = document.getElementById('conta-nova-senha').value;
+  const conf = document.getElementById('conta-conf-senha').value;
+  if (!nova || nova.length < 6) { contaMsg('A senha deve ter pelo menos 6 caracteres.', 'erro'); return; }
+  if (nova !== conf) { contaMsg('As senhas não coincidem.', 'erro'); return; }
+  const btn = document.getElementById('btn-trocar-senha');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const { error } = await sb.auth.updateUser({ password: nova });
+  btn.disabled = false; btn.textContent = 'Salvar nova senha';
+  if (error) { contaMsg(traduirErroAuth(error.message), 'erro'); return; }
+  contaMsg('✅ Senha alterada com sucesso!', 'ok');
+  document.getElementById('conta-nova-senha').value = '';
+  document.getElementById('conta-conf-senha').value = '';
+}
+
+// ─── USER MENU ───────────────────────────────────────────────────────────────
+function toggleUserMenu() {
+  document.getElementById('user-menu').classList.toggle('show');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#user-avatar-btn') && !e.target.closest('#user-menu')) {
+    document.getElementById('user-menu').classList.remove('show');
+  }
+});
+
+function setUserUI(user) {
+  if (!user) return;
+  const nome = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário';
+  const iniciais = nome.split(' ').map(p => p[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('user-initials').textContent = iniciais;
+  document.getElementById('menu-user-name').textContent = nome;
+  document.getElementById('menu-user-email').textContent = user.email || '';
+}
+
+// ─── SYNC SUPABASE ───────────────────────────────────────────────────────────
+function setSyncStatus(status) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  if (!dot) return;
+  if (status === 'sync') { dot.className='sync-indicator syncing'; label.textContent='Sincronizando...'; }
+  else if (status === 'ok') { dot.className='sync-indicator'; label.textContent='Sincronizado'; }
+  else { dot.className='sync-indicator'; dot.style.background='var(--red)'; label.textContent='Sem conexão'; }
+}
+
+async function syncLoad() {
+  if (!USE_SUPABASE || !currentUser) { load(); return; }
+  setSyncStatus('sync');
+  try {
+    const uid = currentUser.id;
+    const [{ data: concs, error: e1 }, { data: mats, error: e2 }, { data: sess, error: e3 }] = await Promise.all([
+      sb.from('concursos').select('*').eq('user_id', uid).order('criado_em'),
+      sb.from('materias').select('*').eq('user_id', uid),
+      sb.from('sessoes').select('*').eq('user_id', uid).order('data', { ascending: false })
+    ]);
+
+    if (e1 || e2 || e3) throw new Error(e1?.message || e2?.message || e3?.message);
+
+    st.concursos = (concs || []).map(c => ({
+      id: c.id, nome: c.nome, dataProva: c.data_prova,
+      metaSemanal: c.meta_semanal, cor: c.cor,
+      materias: (mats || []).filter(m => m.concurso_id === c.id).map(m => ({
+        id: m.id, nome: m.nome, metaHoras: m.meta_horas, prioridade: m.prioridade
+      }))
+    }));
+    st.sessoes = (sess || []).map(s => ({
+      id: s.id, concursoId: s.concurso_id, materiaId: s.materia_id,
+      concurso: s.concurso_nome, materia: s.materia_nome,
+      duracao: s.duracao, data: s.data, nota: s.nota
+    }));
+
+    // BUG FIX: salva localmente após carregar da nuvem (backup offline)
+    save();
+    setSyncStatus('ok');
+  } catch(e) {
+    console.error('syncLoad error:', e);
+    setSyncStatus('error');
+    load(); // fallback local
+  }
+}
+
+// Wrapper save — salva local E no Supabase
+// BUG FIX: valida se string é UUID válido para Supabase
+function isUUID(str) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+async function syncSave() {
+  save(); // sempre salva local como backup
+  if (!USE_SUPABASE || !currentUser) return;
+  setSyncStatus('sync');
+  try {
+    const uid = currentUser.id;
+    for (const c of st.concursos) {
+      // BUG FIX: só faz upsert se o ID for UUID válido
+      if (!isUUID(c.id)) { c.id = generateUUID(); save(); }
+      await sb.from('concursos').upsert({
+        id: c.id, user_id: uid, nome: c.nome,
+        data_prova: c.dataProva || null,
+        meta_semanal: c.metaSemanal || 0,
+        cor: c.cor || '#2d6a4f'
+      });
+      for (const m of (c.materias || [])) {
+        if (!isUUID(m.id)) { m.id = generateUUID(); save(); }
+        await sb.from('materias').upsert({
+          id: m.id, user_id: uid, concurso_id: c.id,
+          nome: m.nome,
+          meta_horas: m.metaHoras || 0,
+          prioridade: m.prioridade || 'media'
+        });
+      }
+    }
+    for (const s of st.sessoes.slice(0, 50)) {
+      if (!isUUID(s.id)) { s.id = generateUUID(); save(); }
+      await sb.from('sessoes').upsert({
+        id: s.id, user_id: uid,
+        concurso_id: isUUID(s.concursoId) ? s.concursoId : null,
+        materia_id: isUUID(s.materiaId) ? s.materiaId : null,
+        concurso_nome: s.concurso,
+        materia_nome: s.materia,
+        duracao: s.duracao,
+        data: s.data,
+        nota: s.nota || null
+      });
+    }
+    setSyncStatus('ok');
+  } catch(e) {
+    console.error('syncSave error:', e);
+    setSyncStatus('error');
+  }
+}
+
+// ─── MODO LOCAL (sem Supabase configurado) ───────────────────────────────────
+function entrarModoLocal() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('user-initials').textContent = '👤';
+  document.getElementById('menu-user-name').textContent = 'Modo local';
+  document.getElementById('menu-user-email').textContent = 'Configure o Supabase para salvar na nuvem';
+  document.getElementById('sync-label').textContent = 'Modo offline';
+  document.getElementById('sync-dot').style.background = 'var(--amber)';
+  initApp();
+}
+
+// ─── INICIALIZAÇÃO COM AUTH ──────────────────────────────────────────────────
+async function initComAuth() {
+  if (!USE_SUPABASE) {
+    // Sem Supabase: mostrar tela de login com aviso
+    document.getElementById('auth-error').textContent =
+      '⚠️ Supabase não configurado. Clique em "Entrar" para usar no modo local (dados ficam apenas neste dispositivo).';
+    document.getElementById('auth-error').classList.add('show');
+    document.getElementById('auth-error').style.background = 'var(--amber-light)';
+    document.getElementById('auth-error').style.color = 'var(--amber)';
+    // Botões funcionam em modo local
+    document.getElementById('btn-login').onclick = entrarModoLocal;
+    document.getElementById('btn-cadastro').onclick = entrarModoLocal;
+    return;
+  }
+
+  // Verificar se já há sessão ativa
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    await iniciarSessao();
+    return;
+  }
+
+  // Escutar mudanças de auth
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      currentUser = session.user;
+      await iniciarSessao();
+    } else if (event === 'SIGNED_OUT') {
+      document.getElementById('auth-screen').classList.remove('hidden');
+    }
+  });
+}
+
+async function iniciarSessao() {
+  if (appInitialized) return; // BUG FIX: evita dupla inicialização
+  appInitialized = true;
+  setUserUI(currentUser);
+  document.getElementById('auth-screen').classList.add('hidden');
+  await syncLoad();
+  initApp();
+}
+
+function initApp() {
+  document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  document.getElementById('manual-data').value = today();
+  const sobreDataEl = document.getElementById('sobre-data-update');
+  if (sobreDataEl) sobreDataEl.textContent = new Date().toLocaleDateString('pt-BR', { day:'numeric', month:'long', year:'numeric' });
+  loadTheme();
+  populateAllSelects();
+  renderDashboard();
+  renderSidebar();
+  renderPomoDisplay();
+  initSimulados();
+  mostrarFrase();
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+loadTheme(); // aplica tema antes de tudo para evitar flash
+initComAuth();
+</script>
+</body>
+</html>
