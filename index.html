@@ -3111,7 +3111,7 @@ Instruções:
         'apikey': SUPABASE_KEY
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20251001',
+        model: 'claude-haiku-4-5',
         max_tokens: 1000,
         system: systemPrompt,
         messages: aiHistory.slice(-10)
@@ -3232,7 +3232,7 @@ Responda APENAS com JSON válido, sem texto antes ou depois, neste formato exato
         'apikey': SUPABASE_KEY
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20251001',
+        model: 'claude-haiku-4-5',
         max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -3402,7 +3402,7 @@ Em 3-4 frases curtas, dê um feedback motivador e 2 dicas práticas de como melh
         'apikey': SUPABASE_KEY
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20251001', max_tokens: 400,
+        model: 'claude-haiku-4-5', max_tokens: 400,
         messages: [{ role: 'user', content: fbPrompt }]
       })
     });
