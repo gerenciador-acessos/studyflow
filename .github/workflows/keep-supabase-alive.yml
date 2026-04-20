@@ -12,7 +12,7 @@ jobs:
       - name: Ping Supabase
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://xgfrfyatkgfgrtbhfpus.supabase.co/rest/v1/" \
+            "https://vxhkppfelyvslmekzqwo.supabase.co/rest/v1/" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
           echo "Status HTTP: $STATUS"
